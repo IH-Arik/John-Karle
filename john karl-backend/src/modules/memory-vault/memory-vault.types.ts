@@ -19,6 +19,7 @@ export type PublicMemoryVaultItem = {
   narrative: string;
   date: string;
   tags: string[];
+  location?: string;
   createdAt: string;
   updatedAt: string;
 };

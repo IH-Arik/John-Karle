@@ -16,6 +16,7 @@ export type MemoryVault = {
   narrative: string;
   date: Date;
   tags: string[];
+  location?: string;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -102,6 +103,11 @@ const memoryVaultSchema = new Schema<MemoryVault, MemoryVaultModel>(
     tags: {
       type: [String],
       default: [],
+    },
+    location: {
+      type: String,
+      trim: true,
+      maxlength: 200,
     },
   },
   {

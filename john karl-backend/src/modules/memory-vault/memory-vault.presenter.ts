@@ -10,6 +10,7 @@ export const toPublicMemoryVaultItem = (memory: MemoryVaultDocument): PublicMemo
   narrative: memory.narrative,
   date: memory.date.toISOString(),
   tags: memory.tags,
+  location: memory.location,
   createdAt: memory.createdAt.toISOString(),
   updatedAt: memory.updatedAt.toISOString(),
 });

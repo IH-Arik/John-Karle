@@ -8,6 +8,7 @@ process.env.LOG_LEVEL = "silent";
 const verifyTokenMock = vi.fn();
 const listMemoriesMock = vi.fn();
 const getTimelineMock = vi.fn();
+const getMemoryQuoteMock = vi.fn();
 
 vi.mock("../src/modules/auth/auth.tokens.js", () => ({
   verifyToken: verifyTokenMock,
@@ -23,6 +24,7 @@ vi.mock("../src/modules/memory-vault/memory-vault.service.js", () => ({
   getTimeline: getTimelineMock,
   createMemory: vi.fn(),
   getMemory: vi.fn(),
+  getMemoryQuote: getMemoryQuoteMock,
   updateMemory: vi.fn(),
   deleteMemory: vi.fn(),
 }));
@@ -73,6 +75,7 @@ describe("memory vault routes", () => {
 
     listMemoriesMock.mockResolvedValue([]);
     getTimelineMock.mockResolvedValue([]);
+    getMemoryQuoteMock.mockReset();
   });
 
   it("requires an access token to list memories", async () => {
@@ -163,6 +166,37 @@ describe("memory vault routes", () => {
       {
         familyMemberUserId: "507f1f77bcf86cd799439099",
       },
+    );
+  });
+
+  it("requires an access token to fetch a memory's quote", async () => {
+    const response = await request(app).get(
+      "/api/v1/memory-vault/507f1f77bcf86cd799439099/quote",
+    );
+
+    expect(response.status).toBe(401);
+    expect(response.body).toMatchObject({
+      success: false,
+      message: "Authentication token is required.",
+    });
+  });
+
+  it("returns the cached quote for an authenticated request", async () => {
+    getMemoryQuoteMock.mockResolvedValue({ pullQuote: "A quote.", commentary: "Commentary." });
+
+    const response = await request(app)
+      .get("/api/v1/memory-vault/507f1f77bcf86cd799439099/quote")
+      .set(authHeadersFor("user-token"));
+
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({
+      success: true,
+      message: "Memory quote fetched successfully.",
+      data: { pullQuote: "A quote.", commentary: "Commentary." },
+    });
+    expect(getMemoryQuoteMock).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "507f1f77bcf86cd799439013" }),
+      { memoryId: "507f1f77bcf86cd799439099" },
     );
   });
 });

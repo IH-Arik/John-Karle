@@ -146,6 +146,62 @@
 
 /**
  * @swagger
+ * /api/v1/memory-vault/{memoryId}/quote:
+ *   get:
+ *     tags: [Memory Vault]
+ *     summary: Get the AI-generated pull-quote for a memory
+ *     description: Retrieves the cached Lineage.AI-generated pull-quote and commentary for a memory, if one has been generated. Returns null fields when generation hasn't completed yet.
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: memoryId
+ *         required: true
+ *         schema:
+ *           type: string
+ *           pattern: "^[0-9a-fA-F]{24}$"
+ *         description: 24-character hexadecimal MongoDB ObjectId
+ *     responses:
+ *       200:
+ *         description: Memory quote fetched successfully (may be null if not yet generated)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   $ref: "#/components/schemas/MemoryQuote"
+ *       400:
+ *         description: Invalid memory ID format
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: "#/components/schemas/ErrorResponse"
+ *       401:
+ *         description: Authentication required
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: "#/components/schemas/ErrorResponse"
+ *       403:
+ *         description: Not permitted to view this family member's memories
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: "#/components/schemas/ErrorResponse"
+ *       404:
+ *         description: Memory not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: "#/components/schemas/ErrorResponse"
+ */
+
+/**
+ * @swagger
  * /api/v1/memory-vault:
  *   post:
  *     tags: [Memory Vault]
@@ -189,6 +245,11 @@
  *                 type: string
  *                 description: Comma-separated list or JSON array of tags
  *                 example: "milestone, family"
+ *               location:
+ *                 type: string
+ *                 maxLength: 200
+ *                 description: Required for 'photo' and 'video' memory types.
+ *                 example: "Grandma's backyard"
  *               files:
  *                 type: array
  *                 items:
@@ -266,6 +327,10 @@
  *               tags:
  *                 type: string
  *                 description: Comma-separated list or JSON array of tags
+ *               location:
+ *                 type: string
+ *                 maxLength: 200
+ *                 description: Required for 'photo' and 'video' memory types.
  *               files:
  *                 type: array
  *                 items:

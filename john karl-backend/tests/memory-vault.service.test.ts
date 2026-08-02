@@ -4,9 +4,16 @@ import { Types } from "mongoose";
 process.env.NODE_ENV = "test";
 process.env.JWT_SECRET = "test-secret-with-enough-length-for-auth-tests";
 process.env.LOG_LEVEL = "silent";
+process.env.AWS_REGION = "ap-southeast-1";
+process.env.S3_BUCKET_NAME = "test-bucket";
+process.env.AWS_ACCESS_KEY_ID = "test-access-key";
+process.env.AWS_SECRET_ACCESS_KEY = "test-secret-key";
 
 const areAcceptedFamilyMembersMock = vi.fn();
 const createAuditLogMock = vi.fn().mockResolvedValue(undefined);
+const s3SendMock = vi.fn().mockResolvedValue({});
+const triggerMemoryQuoteGenerationMock = vi.fn();
+const fetchCachedMemoryQuoteMock = vi.fn();
 
 vi.mock("../src/modules/users/user-family-membership.service.js", () => ({
   areAcceptedFamilyMembers: areAcceptedFamilyMembersMock,
@@ -14,6 +21,23 @@ vi.mock("../src/modules/users/user-family-membership.service.js", () => ({
 
 vi.mock("../src/modules/audit-logs/audit-log.service.js", () => ({
   createAuditLog: createAuditLogMock,
+}));
+
+vi.mock("@aws-sdk/client-s3", () => ({
+  S3Client: class {
+    send = s3SendMock;
+  },
+  PutObjectCommand: class {
+    constructor(public readonly input: unknown) {}
+  },
+  DeleteObjectsCommand: class {
+    constructor(public readonly input: unknown) {}
+  },
+}));
+
+vi.mock("../src/utils/ai-service.client.js", () => ({
+  triggerMemoryQuoteGeneration: triggerMemoryQuoteGenerationMock,
+  fetchCachedMemoryQuote: fetchCachedMemoryQuoteMock,
 }));
 
 const memoryVaultService = await import("../src/modules/memory-vault/memory-vault.service.js");
@@ -28,6 +52,8 @@ describe("memory vault service", () => {
     vi.restoreAllMocks();
     areAcceptedFamilyMembersMock.mockReset();
     createAuditLogMock.mockClear();
+    triggerMemoryQuoteGenerationMock.mockClear();
+    fetchCachedMemoryQuoteMock.mockReset();
   });
 
   it("writes an audit log when the owner creates a memory", async () => {
@@ -283,5 +309,163 @@ describe("memory vault service", () => {
         targetLabel: "Updated Entry",
       }),
     );
+  });
+
+  it("rejects creating a photo memory without a location", async () => {
+    const ownerId = new Types.ObjectId();
+    const user = {
+      id: ownerId.toString(),
+      email: "owner@example.com",
+      role: "user" as const,
+      tokenVersion: 0,
+    };
+
+    await expect(
+      memoryVaultService.createMemory(
+        user,
+        {
+          type: "photo",
+          whoseMemoryIsThis: "Owner",
+          title: "Entry",
+          narrative: "Story",
+          date: new Date("2026-06-10T00:00:00.000Z"),
+          tags: [],
+        },
+        [
+          {
+            originalname: "photo.jpg",
+            mimetype: "image/jpeg",
+            size: 10,
+            buffer: Buffer.from("test"),
+          } as Express.Multer.File,
+        ],
+      ),
+    ).rejects.toMatchObject({ code: "LOCATION_REQUIRED" });
+  });
+
+  it("creates a photo memory with a location and triggers quote generation", async () => {
+    const ownerId = new Types.ObjectId();
+    const memoryId = new Types.ObjectId();
+
+    vi.spyOn(MemoryVaultModel, "create").mockResolvedValue({
+      _id: memoryId,
+      userId: ownerId,
+      type: "photo",
+      whoseMemoryIsThis: "Owner",
+      files: [],
+      title: "Entry",
+      narrative: "Story",
+      date: new Date("2026-06-10T00:00:00.000Z"),
+      tags: [],
+      location: "Grandma's backyard",
+      createdAt: new Date("2026-06-10T00:00:00.000Z"),
+      updatedAt: new Date("2026-06-10T00:00:00.000Z"),
+    } as never);
+
+    const result = await memoryVaultService.createMemory(
+      {
+        id: ownerId.toString(),
+        email: "owner@example.com",
+        role: "user",
+        tokenVersion: 0,
+      },
+      {
+        type: "photo",
+        whoseMemoryIsThis: "Owner",
+        title: "Entry",
+        narrative: "Story",
+        date: new Date("2026-06-10T00:00:00.000Z"),
+        tags: [],
+        location: "Grandma's backyard",
+      },
+      [
+        {
+          originalname: "photo.jpg",
+          mimetype: "image/jpeg",
+          size: 10,
+          buffer: Buffer.from("test"),
+        } as Express.Multer.File,
+      ],
+    );
+
+    expect(result.location).toBe("Grandma's backyard");
+    expect(triggerMemoryQuoteGenerationMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        memory_id: memoryId.toString(),
+        person: "Owner",
+        memory: expect.objectContaining({ location: "Grandma's backyard" }),
+      }),
+    );
+  });
+
+  it("returns the cached quote for a readable memory", async () => {
+    const requesterId = new Types.ObjectId();
+    const ownerId = new Types.ObjectId();
+    const memory = {
+      _id: new Types.ObjectId(),
+      userId: ownerId,
+      type: "journal",
+      whoseMemoryIsThis: "Owner",
+      files: [],
+      title: "Entry",
+      narrative: "Story",
+      date: new Date("2026-06-10T00:00:00.000Z"),
+      tags: [],
+      createdAt: new Date("2026-06-10T00:00:00.000Z"),
+      updatedAt: new Date("2026-06-10T00:00:00.000Z"),
+    };
+
+    areAcceptedFamilyMembersMock.mockResolvedValue(true);
+    vi.spyOn(MemoryVaultModel, "findById").mockReturnValue(mockExecResolved(memory) as never);
+    fetchCachedMemoryQuoteMock.mockResolvedValue({
+      success: true,
+      memory_id: memory._id.toString(),
+      pull_quote: "A quote.",
+      commentary: "Some commentary.",
+    });
+
+    const result = await memoryVaultService.getMemoryQuote(
+      {
+        id: requesterId.toString(),
+        email: "requester@example.com",
+        role: "user",
+        tokenVersion: 0,
+      },
+      { memoryId: memory._id.toString() },
+    );
+
+    expect(result).toEqual({ pullQuote: "A quote.", commentary: "Some commentary." });
+  });
+
+  it("returns nulls when no quote has been cached yet", async () => {
+    const ownerId = new Types.ObjectId();
+    const memory = {
+      _id: new Types.ObjectId(),
+      userId: ownerId,
+      type: "journal",
+      whoseMemoryIsThis: "Owner",
+      files: [],
+      title: "Entry",
+      narrative: "Story",
+      date: new Date("2026-06-10T00:00:00.000Z"),
+      tags: [],
+      createdAt: new Date("2026-06-10T00:00:00.000Z"),
+      updatedAt: new Date("2026-06-10T00:00:00.000Z"),
+    };
+
+    vi.spyOn(MemoryVaultModel, "findById").mockReturnValue(mockExecResolved(memory) as never);
+    fetchCachedMemoryQuoteMock.mockResolvedValue(null);
+
+    const result = await memoryVaultService.getMemoryQuote(
+      {
+        id: ownerId.toString(),
+        email: "owner@example.com",
+        role: "user",
+        tokenVersion: 0,
+      },
+      { memoryId: memory._id.toString() },
+    );
+
+    expect(result).toEqual({ pullQuote: null, commentary: null });
   });
 });

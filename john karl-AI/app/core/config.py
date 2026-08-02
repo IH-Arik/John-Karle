@@ -33,6 +33,12 @@ class Settings(BaseSettings):
     anthropic_api_key: SecretStr | None = None
     anthropic_max_retries: int = Field(default=0, ge=0, le=5)
 
+    memory_chat_db_path: str = "memory_chat.sqlite3"
+    memory_chat_window_turns: int = Field(default=20, ge=2, le=200)
+    memory_chat_summary_trigger_turns: int = Field(default=10, ge=1, le=200)
+
+    memory_quote_db_path: str = "memory_quote.sqlite3"
+
     @property
     def cors_origin_list(self) -> list[str]:
         if self.cors_origins.strip() == "*":

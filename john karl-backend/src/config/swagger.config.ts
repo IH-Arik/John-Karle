@@ -231,8 +231,33 @@ const options: swaggerJsdoc.Options = {
             narrative: { type: "string" },
             date: { type: "string", format: "date-time" },
             tags: { type: "array", items: { type: "string" } },
+            location: { type: "string" },
             createdAt: { type: "string", format: "date-time" },
             updatedAt: { type: "string", format: "date-time" },
+          },
+        },
+        MemoryQuote: {
+          type: "object",
+          properties: {
+            pullQuote: { type: "string", nullable: true },
+            commentary: { type: "string", nullable: true },
+          },
+        },
+        MemoryChatCitation: {
+          type: "object",
+          properties: {
+            memoryTitle: { type: "string" },
+            citedText: { type: "string" },
+          },
+        },
+        MemoryChatResponse: {
+          type: "object",
+          properties: {
+            answer: { type: "string" },
+            citations: {
+              type: "array",
+              items: { $ref: "#/components/schemas/MemoryChatCitation" },
+            },
           },
         },
         MemoryTimelineGroup: {
@@ -360,6 +385,7 @@ const options: swaggerJsdoc.Options = {
     "./src/modules/admin/admin.swagger.ts",
     "./src/modules/users/user.swagger.ts",
     "./src/modules/memory-vault/memory-vault.swagger.ts",
+    "./src/modules/memory-chat/memory-chat.swagger.ts",
     "./src/modules/notifications/notification.swagger.ts",
     "./src/modules/report-feedback/report-feedback.swagger.ts",
     "./src/modules/health/health.swagger.ts",

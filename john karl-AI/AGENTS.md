@@ -1,5 +1,7 @@
 # Agent Instructions
 
+Read [`REPO_BOUNDARIES.md`](REPO_BOUNDARIES.md) first. It defines what may and may not be touched in the sibling `john karl-backend` and `john karl-dashboard` repositories.
+
 ## Python Environment
 
 - Use Python 3.11+ and a local `.venv`.

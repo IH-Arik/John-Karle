@@ -31,6 +31,11 @@ memoryVaultRouter.get(
   validateRequest({ params: memoryVaultParamsSchema }),
   memoryVaultController.getMemory,
 );
+memoryVaultRouter.get(
+  "/:memoryId/quote",
+  validateRequest({ params: memoryVaultParamsSchema }),
+  memoryVaultController.getMemoryQuote,
+);
 memoryVaultRouter.post(
   "/",
   memoryVaultUpload,

@@ -65,6 +65,16 @@ export const getMemory: RequestHandler = asyncHandler(async (req, res) => {
   });
 });
 
+export const getMemoryQuote: RequestHandler = asyncHandler(async (req, res) => {
+  const user = requireAuthenticatedUser(req);
+  const quote = await memoryVaultService.getMemoryQuote(user, req.params as MemoryVaultParams);
+
+  sendSuccess(res, {
+    message: "Memory quote fetched successfully.",
+    data: quote,
+  });
+});
+
 export const updateMemory: RequestHandler = asyncHandler(async (req, res) => {
   const user = requireAuthenticatedUser(req);
   const files = extractMemoryVaultFiles(req);

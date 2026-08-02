@@ -40,6 +40,8 @@ export const env = cleanEnv(process.env, {
   AWS_ACCESS_KEY_ID: str({ default: "" }),
   AWS_SECRET_ACCESS_KEY: str({ default: "" }),
   APP_BASE_URL: str({ default: "http://localhost:3000" }),
+  AI_SERVICE_URL: str({ default: "http://localhost:8000" }),
+  AI_SERVICE_API_KEY: str({ default: "" }),
 });
 
 if (env.NODE_ENV === "production" && env.JWT_SECRET === developmentJwtSecret) {

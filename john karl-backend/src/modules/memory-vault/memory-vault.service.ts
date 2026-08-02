@@ -2,6 +2,11 @@ import { DeleteObjectsCommand, PutObjectCommand, S3Client } from "@aws-sdk/clien
 import { randomUUID } from "node:crypto";
 
 import { env } from "../../config/env.config.js";
+import {
+  fetchCachedMemoryQuote,
+  triggerMemoryQuoteGeneration,
+  type AiMemoryPayload,
+} from "../../utils/ai-service.client.js";
 import { ApiError } from "../../utils/api-error.util.js";
 import { createAuditLog } from "../audit-logs/audit-log.service.js";
 import type { AuthenticatedUser } from "../auth/auth.types.js";
@@ -149,6 +154,21 @@ const ensureMemoryHasRequiredFiles = (type: string, fileCount: number): void => 
   }
 };
 
+const ensureLocationProvidedForVisualTypes = (type: string, location: string | undefined): void => {
+  if ((type === "photo" || type === "video") && !location) {
+    throw new ApiError(400, "Location is required for photo and video memories.", "LOCATION_REQUIRED");
+  }
+};
+
+const toAiMemoryPayload = (memory: MemoryVaultDocument): AiMemoryPayload => ({
+  type: memory.type,
+  title: memory.title,
+  narrative: memory.narrative,
+  date: memory.date.toISOString(),
+  tags: memory.tags,
+  location: memory.location,
+});
+
 const resolveReadableUserId = async (
   authenticatedUser: AuthenticatedUser,
   query?: MemoryVaultQuery,
@@ -182,6 +202,7 @@ export const createMemory = async (
   try {
     uploadedFiles = await uploadFilesToS3(user.id, files);
     ensureMemoryHasRequiredFiles(input.type, uploadedFiles.length);
+    ensureLocationProvidedForVisualTypes(input.type, input.location);
 
     const memory = await MemoryVaultModel.create({
       userId: user.id,
@@ -192,6 +213,7 @@ export const createMemory = async (
       narrative: input.narrative,
       date: input.date,
       tags: input.tags,
+      location: input.location,
     });
 
     await createAuditLog({
@@ -207,6 +229,12 @@ export const createMemory = async (
       targetType: "memory",
       targetId: memory._id.toString(),
       targetLabel: memory.title,
+    });
+
+    triggerMemoryQuoteGeneration({
+      memory_id: memory._id.toString(),
+      person: memory.whoseMemoryIsThis,
+      memory: toAiMemoryPayload(memory),
     });
 
     return toPublicMemoryVaultItem(memory);
@@ -296,7 +324,12 @@ export const updateMemory = async (
       memory.tags = input.tags;
     }
 
+    if (input.location !== undefined) {
+      memory.location = input.location;
+    }
+
     ensureMemoryHasRequiredFiles(memory.type, memory.files.length);
+    ensureLocationProvidedForVisualTypes(memory.type, memory.location);
 
     await memory.save();
 
@@ -315,6 +348,12 @@ export const updateMemory = async (
       targetLabel: memory.title,
     });
 
+    triggerMemoryQuoteGeneration({
+      memory_id: memory._id.toString(),
+      person: memory.whoseMemoryIsThis,
+      memory: toAiMemoryPayload(memory),
+    });
+
     if (files.length > 0) {
       await deleteFilesFromS3(previousFiles).catch(() => undefined);
     }
@@ -324,6 +363,16 @@ export const updateMemory = async (
     await deleteFilesFromS3(uploadedFiles).catch(() => undefined);
     throw error;
   }
+};
+
+export const getMemoryQuote = async (user: AuthenticatedUser, params: MemoryVaultParams) => {
+  const memory = await findReadableMemoryOrThrow(user, params.memoryId);
+  const cached = await fetchCachedMemoryQuote(memory._id.toString());
+
+  return {
+    pullQuote: cached?.pull_quote ?? null,
+    commentary: cached?.commentary ?? null,
+  };
 };
 
 export const deleteMemory = async (user: AuthenticatedUser, params: MemoryVaultParams) => {

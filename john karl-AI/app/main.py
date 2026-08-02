@@ -10,7 +10,11 @@ from app.core.errors import register_exception_handlers
 from app.core.logging import configure_logging
 from app.middleware.request_context import RequestContextMiddleware
 from app.providers.factory import build_provider
+from app.services.conversation_store import ConversationStore
 from app.services.inference import InferenceService
+from app.services.memory_chat import MemoryChatService
+from app.services.memory_quote import MemoryQuoteService
+from app.services.memory_quote_store import MemoryQuoteStore
 from app.services.safety import PromptSafetyService
 
 
@@ -18,10 +22,28 @@ from app.services.safety import PromptSafetyService
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     settings = get_settings()
     provider = build_provider(settings)
+    safety = PromptSafetyService(settings)
     app.state.inference_service = InferenceService(
         provider=provider,
-        safety=PromptSafetyService(settings),
+        safety=safety,
         settings=settings,
+    )
+    conversations = ConversationStore(
+        settings.memory_chat_db_path,
+        window_turns=settings.memory_chat_window_turns,
+        summary_trigger_turns=settings.memory_chat_summary_trigger_turns,
+    )
+    app.state.memory_chat_service = MemoryChatService(
+        provider=provider,
+        safety=safety,
+        settings=settings,
+        conversations=conversations,
+    )
+    app.state.memory_quote_service = MemoryQuoteService(
+        provider=provider,
+        safety=safety,
+        settings=settings,
+        store=MemoryQuoteStore(settings.memory_quote_db_path),
     )
     yield
     await provider.close()

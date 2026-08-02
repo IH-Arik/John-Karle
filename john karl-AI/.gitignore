@@ -16,3 +16,8 @@ venv/
 .DS_Store
 dist/
 build/
+
+# Memory Chat conversation store (runtime data, not source)
+*.sqlite3
+*.sqlite3-wal
+*.sqlite3-shm

@@ -54,6 +54,7 @@ const bodyBaseSchema = z.object({
   narrative: z.string().trim().min(1).max(5000),
   date: isoDateSchema,
   tags: tagsSchema.default([]),
+  location: z.string().trim().min(1).max(200).optional(),
 });
 
 export const createMemoryVaultBodySchema = bodyBaseSchema.strict();
