@@ -6,9 +6,14 @@ process.env.JWT_SECRET = "test-secret-with-enough-length-for-auth-tests";
 process.env.LOG_LEVEL = "silent";
 
 const requestMemoryChatMock = vi.fn();
+const areAcceptedFamilyMembersMock = vi.fn();
 
 vi.mock("../src/utils/ai-service.client.js", () => ({
   requestMemoryChat: requestMemoryChatMock,
+}));
+
+vi.mock("../src/modules/users/user-family-membership.service.js", () => ({
+  areAcceptedFamilyMembers: areAcceptedFamilyMembersMock,
 }));
 
 const memoryChatService = await import("../src/modules/memory-chat/memory-chat.service.js");
@@ -22,6 +27,7 @@ describe("memory chat service", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
     requestMemoryChatMock.mockReset();
+    areAcceptedFamilyMembersMock.mockReset();
   });
 
   it("scopes retrieval to the requesting user's own memories for the named person", async () => {
@@ -81,5 +87,75 @@ describe("memory chat service", () => {
       answer: "Margaret loved walking around the garden.",
       citations: [{ memoryTitle: "First Steps", citedText: "She walked across the room." }],
     });
+  });
+
+  it("searches an accepted family member's memories when familyMemberUserId is provided", async () => {
+    const requesterId = new Types.ObjectId();
+    const familyMemberId = new Types.ObjectId();
+
+    areAcceptedFamilyMembersMock.mockResolvedValue(true);
+    const findSpy = vi.spyOn(MemoryVaultModel, "find").mockReturnValue({
+      sort: vi.fn().mockReturnValue(mockExecResolved([])),
+    } as never);
+
+    requestMemoryChatMock.mockResolvedValue({
+      success: true,
+      request_id: "req-2",
+      answer: "Margaret loved gardening.",
+      citations: [],
+      usage: {},
+      latency_ms: 90,
+    });
+
+    await memoryChatService.chat(
+      {
+        id: requesterId.toString(),
+        email: "requester@example.com",
+        role: "user",
+        tokenVersion: 0,
+      },
+      {
+        person: "Margaret",
+        question: "What did Margaret love to do?",
+        familyMemberUserId: familyMemberId.toString(),
+      },
+    );
+
+    expect(areAcceptedFamilyMembersMock).toHaveBeenCalledWith(
+      requesterId.toString(),
+      familyMemberId.toString(),
+    );
+    expect(findSpy).toHaveBeenCalledWith({
+      userId: familyMemberId.toString(),
+      whoseMemoryIsThis: "Margaret",
+    });
+    expect(requestMemoryChatMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        conversation_id: `${requesterId.toString()}:margaret`,
+      }),
+    );
+  });
+
+  it("rejects familyMemberUserId access for users who are not accepted family members", async () => {
+    const requesterId = new Types.ObjectId();
+    const familyMemberId = new Types.ObjectId();
+
+    areAcceptedFamilyMembersMock.mockResolvedValue(false);
+
+    await expect(
+      memoryChatService.chat(
+        {
+          id: requesterId.toString(),
+          email: "requester@example.com",
+          role: "user",
+          tokenVersion: 0,
+        },
+        {
+          person: "Margaret",
+          question: "What did Margaret love to do?",
+          familyMemberUserId: familyMemberId.toString(),
+        },
+      ),
+    ).rejects.toMatchObject({ code: "FORBIDDEN" });
   });
 });

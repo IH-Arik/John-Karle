@@ -1,6 +1,8 @@
 import { requestMemoryChat, type AiMemoryPayload } from "../../utils/ai-service.client.js";
+import { ApiError } from "../../utils/api-error.util.js";
 import type { AuthenticatedUser } from "../auth/auth.types.js";
 import { MemoryVaultModel } from "../memory-vault/memory-vault.model.js";
+import { areAcceptedFamilyMembers } from "../users/user-family-membership.service.js";
 import type { MemoryChatInput } from "./memory-chat.validation.js";
 
 export type MemoryChatCitation = {
@@ -15,6 +17,27 @@ export type MemoryChatResult = {
 
 const buildConversationId = (userId: string, person: string): string =>
   `${userId}:${person.trim().toLowerCase()}`;
+
+const resolveReadableUserId = async (
+  authenticatedUser: AuthenticatedUser,
+  familyMemberUserId: string | undefined,
+): Promise<string> => {
+  if (!familyMemberUserId || familyMemberUserId === authenticatedUser.id) {
+    return authenticatedUser.id;
+  }
+
+  const isFamilyMember = await areAcceptedFamilyMembers(authenticatedUser.id, familyMemberUserId);
+
+  if (!isFamilyMember) {
+    throw new ApiError(
+      403,
+      "You do not have permission to view this family member's memories.",
+      "FORBIDDEN",
+    );
+  }
+
+  return familyMemberUserId;
+};
 
 const toAiMemoryPayload = (memory: {
   type: AiMemoryPayload["type"];
@@ -36,8 +59,9 @@ export const chat = async (
   user: AuthenticatedUser,
   input: MemoryChatInput,
 ): Promise<MemoryChatResult> => {
+  const readableUserId = await resolveReadableUserId(user, input.familyMemberUserId);
   const memories = await MemoryVaultModel.find({
-    userId: user.id,
+    userId: readableUserId,
     whoseMemoryIsThis: input.person,
   })
     .sort({ date: -1, createdAt: -1 })

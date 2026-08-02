@@ -1297,8 +1297,8 @@
                   "  pm.response.to.have.status(201);",
                   "});",
                   "var json = pm.response.json();",
-                  "if (json.data && json.data.memory && json.data.memory.id) {",
-                  "  pm.collectionVariables.set('memoryId', json.data.memory.id);",
+                  "if (json.data && json.data.id) {",
+                  "  pm.collectionVariables.set('memoryId', json.data.id);",
                   "}"
                 ]
               }
@@ -1364,11 +1364,16 @@
                   "key": "files",
                   "src": "{{memoryFilePathTwo}}",
                   "type": "file"
+                },
+                {
+                  "key": "location",
+                  "value": "Sunny Beach",
+                  "type": "text"
                 }
               ]
             },
             "url": "{{apiV1BaseUrl}}/memory-vault",
-            "description": "Creates a memory vault item. Use either `file` once or repeated `files` fields. `journal` may omit files."
+            "description": "Creates a memory vault item. Use either `file` once or repeated `files` fields. `journal` may omit files. `location` is required for `photo`/`video` types."
           },
           "response": [
             {
@@ -1428,6 +1433,11 @@
                       "key": "files",
                       "src": "/absolute/path/to/photo.jpg",
                       "type": "file"
+                    },
+                    {
+                      "key": "location",
+                      "value": "Sunny Beach",
+                      "type": "text"
                     }
                   ]
                 },
@@ -1436,7 +1446,7 @@
               "status": "Created",
               "code": 201,
               "_postman_previewlanguage": "json",
-              "body": "{\n  \"success\": true,\n  \"data\": {\n    \"memory\": {\n      \"id\": \"507f1f77bcf86cd799439012\",\n      \"type\": \"photo\",\n      \"whoseMemoryIsThis\": \"John\",\n      \"files\": [\n        {\n          \"key\": \"memory-vault/507f1f77bcf86cd799439011/1717891200000-photo.jpg\",\n          \"url\": \"https://your-bucket.s3.ap-southeast-2.amazonaws.com/memory-vault/507f1f77bcf86cd799439011/1717891200000-photo.jpg\",\n          \"originalName\": \"photo.jpg\",\n          \"mimeType\": \"image/jpeg\",\n          \"size\": 245120\n        }\n      ],\n      \"title\": \"Beach Day\",\n      \"narrative\": \"A summer memory.\",\n      \"date\": \"2026-06-09T00:00:00.000Z\",\n      \"tags\": [\"family\", \"summer\"],\n      \"createdAt\": \"2026-06-09T00:00:00.000Z\",\n      \"updatedAt\": \"2026-06-09T00:00:00.000Z\"\n    }\n  }\n}"
+              "body": "{\n  \"success\": true,\n  \"data\": {\n    \"id\": \"507f1f77bcf86cd799439012\",\n    \"type\": \"photo\",\n    \"whoseMemoryIsThis\": \"John\",\n    \"files\": [\n      {\n        \"key\": \"memory-vault/507f1f77bcf86cd799439011/1717891200000-photo.jpg\",\n        \"url\": \"https://your-bucket.s3.ap-southeast-2.amazonaws.com/memory-vault/507f1f77bcf86cd799439011/1717891200000-photo.jpg\",\n        \"originalName\": \"photo.jpg\",\n        \"mimeType\": \"image/jpeg\",\n        \"size\": 245120\n      }\n    ],\n    \"title\": \"Beach Day\",\n    \"narrative\": \"A summer memory.\",\n    \"date\": \"2026-06-09T00:00:00.000Z\",\n    \"tags\": [\"family\", \"summer\"],\n    \"location\": \"Sunny Beach\",\n    \"createdAt\": \"2026-06-09T00:00:00.000Z\",\n    \"updatedAt\": \"2026-06-09T00:00:00.000Z\"\n  }\n}"
             }
           ]
         },
@@ -1489,7 +1499,60 @@
               "status": "OK",
               "code": 200,
               "_postman_previewlanguage": "json",
-              "body": "{\n  \"success\": true,\n  \"data\": {\n    \"memory\": {\n      \"id\": \"507f1f77bcf86cd799439012\",\n      \"type\": \"photo\",\n      \"whoseMemoryIsThis\": \"John\",\n      \"files\": [\n        {\n          \"key\": \"memory-vault/507f1f77bcf86cd799439011/1717891200000-photo.jpg\",\n          \"url\": \"https://your-bucket.s3.ap-southeast-2.amazonaws.com/memory-vault/507f1f77bcf86cd799439011/1717891200000-photo.jpg\",\n          \"originalName\": \"photo.jpg\",\n          \"mimeType\": \"image/jpeg\",\n          \"size\": 245120\n        }\n      ],\n      \"title\": \"Beach Day\",\n      \"narrative\": \"A summer memory.\",\n      \"date\": \"2026-06-09T00:00:00.000Z\",\n      \"tags\": [\"family\", \"summer\"],\n      \"createdAt\": \"2026-06-09T00:00:00.000Z\",\n      \"updatedAt\": \"2026-06-09T00:00:00.000Z\"\n    }\n  }\n}"
+              "body": "{\n  \"success\": true,\n  \"data\": {\n    \"id\": \"507f1f77bcf86cd799439012\",\n    \"type\": \"photo\",\n    \"whoseMemoryIsThis\": \"John\",\n    \"files\": [\n      {\n        \"key\": \"memory-vault/507f1f77bcf86cd799439011/1717891200000-photo.jpg\",\n        \"url\": \"https://your-bucket.s3.ap-southeast-2.amazonaws.com/memory-vault/507f1f77bcf86cd799439011/1717891200000-photo.jpg\",\n        \"originalName\": \"photo.jpg\",\n        \"mimeType\": \"image/jpeg\",\n        \"size\": 245120\n      }\n    ],\n    \"title\": \"Beach Day\",\n    \"narrative\": \"A summer memory.\",\n    \"date\": \"2026-06-09T00:00:00.000Z\",\n    \"tags\": [\"family\", \"summer\"],\n    \"location\": \"Sunny Beach\",\n    \"createdAt\": \"2026-06-09T00:00:00.000Z\",\n    \"updatedAt\": \"2026-06-09T00:00:00.000Z\"\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Get Memory Quote",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{apiV1BaseUrl}}/memory-vault/{{memoryId}}/quote",
+            "description": "Fetches the cached Lineage.AI-generated pull-quote and commentary for a memory. `pullQuote`/`commentary` are `null` if generation hasn't completed yet."
+          },
+          "response": [
+            {
+              "name": "Success",
+              "originalRequest": {
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{accessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": "{{apiV1BaseUrl}}/memory-vault/{{memoryId}}/quote"
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "body": "{\n  \"success\": true,\n  \"data\": {\n    \"pullQuote\": \"A quiet moment worth remembering.\",\n    \"commentary\": \"This is exactly what Lineage.AI helps preserve.\"\n  }\n}"
             }
           ]
         },
@@ -1530,11 +1593,16 @@
                   "key": "tags",
                   "value": "family,summer,updated",
                   "type": "text"
+                },
+                {
+                  "key": "location",
+                  "value": "Sunny Beach, Updated",
+                  "type": "text"
                 }
               ]
             },
             "url": "{{apiV1BaseUrl}}/memory-vault/{{memoryId}}",
-            "description": "Updates metadata. If you include files, they replace the previous S3 file set."
+            "description": "Updates metadata. If you include files, they replace the previous S3 file set. `location` is required for `photo`/`video` types."
           },
           "response": [
             {
@@ -1572,7 +1640,7 @@
               "status": "OK",
               "code": 200,
               "_postman_previewlanguage": "json",
-              "body": "{\n  \"success\": true,\n  \"data\": {\n    \"memory\": {\n      \"id\": \"507f1f77bcf86cd799439012\",\n      \"type\": \"photo\",\n      \"whoseMemoryIsThis\": \"John\",\n      \"files\": [\n        {\n          \"key\": \"memory-vault/507f1f77bcf86cd799439011/1717891200000-photo.jpg\",\n          \"url\": \"https://your-bucket.s3.ap-southeast-2.amazonaws.com/memory-vault/507f1f77bcf86cd799439011/1717891200000-photo.jpg\",\n          \"originalName\": \"photo.jpg\",\n          \"mimeType\": \"image/jpeg\",\n          \"size\": 245120\n        }\n      ],\n      \"title\": \"Updated Beach Day\",\n      \"narrative\": \"Updated story.\",\n      \"date\": \"2026-06-09T00:00:00.000Z\",\n      \"tags\": [\"family\", \"summer\", \"updated\"],\n      \"createdAt\": \"2026-06-09T00:00:00.000Z\",\n      \"updatedAt\": \"2026-06-09T00:10:00.000Z\"\n    }\n  }\n}"
+              "body": "{\n  \"success\": true,\n  \"data\": {\n    \"id\": \"507f1f77bcf86cd799439012\",\n    \"type\": \"photo\",\n    \"whoseMemoryIsThis\": \"John\",\n    \"files\": [\n      {\n        \"key\": \"memory-vault/507f1f77bcf86cd799439011/1717891200000-photo.jpg\",\n        \"url\": \"https://your-bucket.s3.ap-southeast-2.amazonaws.com/memory-vault/507f1f77bcf86cd799439011/1717891200000-photo.jpg\",\n        \"originalName\": \"photo.jpg\",\n        \"mimeType\": \"image/jpeg\",\n        \"size\": 245120\n      }\n    ],\n    \"title\": \"Updated Beach Day\",\n    \"narrative\": \"Updated story.\",\n    \"date\": \"2026-06-09T00:00:00.000Z\",\n    \"tags\": [\"family\", \"summer\", \"updated\"],\n    \"location\": \"Sunny Beach, Updated\",\n    \"createdAt\": \"2026-06-09T00:00:00.000Z\",\n    \"updatedAt\": \"2026-06-09T00:10:00.000Z\"\n  }\n}"
             }
           ]
         },
@@ -1628,6 +1696,113 @@
               "body": ""
             }
           ]
+        }
+      ]
+    },
+    {
+      "name": "Memory Chat",
+      "item": [
+        {
+          "name": "Ask About Person",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"person\": \"John\",\n  \"question\": \"What did John love to do on weekends?\"\n}"
+            },
+            "url": "{{apiV1BaseUrl}}/memory-chat",
+            "description": "Asks Lineage.AI a grounded question about a person's memories. Defaults to the caller's own Memory Vault; pass `familyMemberUserId` (an accepted family member's user id) to ask about their shared memories instead."
+          },
+          "response": [
+            {
+              "name": "Success",
+              "originalRequest": {
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{accessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"person\": \"John\",\n  \"question\": \"What did John love to do on weekends?\"\n}"
+                },
+                "url": "{{apiV1BaseUrl}}/memory-chat"
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "body": "{\n  \"success\": true,\n  \"data\": {\n    \"answer\": \"John loved spending weekends at the beach with his family.\",\n    \"citations\": [\n      {\n        \"memoryTitle\": \"Beach Day\",\n        \"citedText\": \"A summer memory.\"\n      }\n    ]\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Ask About Family Member's Person",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"person\": \"Margaret\",\n  \"question\": \"What did Margaret love to do on weekends?\",\n  \"familyMemberUserId\": \"{{familyMemberUserId}}\"\n}"
+            },
+            "url": "{{apiV1BaseUrl}}/memory-chat",
+            "description": "Same as Ask About Person, but scoped to an accepted family member's Memory Vault via `familyMemberUserId`. Returns 403 if the caller and that user are not accepted family members."
+          },
+          "response": []
         }
       ]
     },
