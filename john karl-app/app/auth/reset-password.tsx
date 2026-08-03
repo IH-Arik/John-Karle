@@ -47,8 +47,20 @@ export default function ResetPasswordScreen() {
             return;
         }
 
-        if (password.length < 6) {
-            Alert.alert('Validation Error', 'Password must be at least 6 characters.');
+        if (password.length < 8) {
+            Alert.alert('Password Error', 'Password must be at least 8 characters long.');
+            return;
+        }
+        if (!/[a-z]/.test(password)) {
+            Alert.alert('Password Error', 'Password must include a lowercase letter (a-z).');
+            return;
+        }
+        if (!/[A-Z]/.test(password)) {
+            Alert.alert('Password Error', 'Password must include an uppercase letter (A-Z).');
+            return;
+        }
+        if (!/[0-9]/.test(password)) {
+            Alert.alert('Password Error', 'Password must include a number (0-9).');
             return;
         }
 
@@ -71,7 +83,14 @@ export default function ResetPasswordScreen() {
                 Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
                 router.push('/auth/reset-success');
             } else {
-                Alert.alert('Error', response.message || 'Failed to reset password. Please try again.');
+                let errorMsg = response.message || 'Failed to reset password. Please try again.';
+                if (Array.isArray(response.errors) && response.errors.length > 0) {
+                    const details = response.errors.map((e: any) => e.message).filter(Boolean).join('\n• ');
+                    if (details) {
+                        errorMsg = `${response.message || 'Validation failed'}:\n• ${details}`;
+                    }
+                }
+                Alert.alert('Error', errorMsg);
             }
         } catch (error: any) {
             Alert.alert('Error', error.message || 'A network error occurred. Please try again.');

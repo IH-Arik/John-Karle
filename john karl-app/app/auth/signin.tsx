@@ -23,6 +23,14 @@ import { ScaledSheet } from 'react-native-size-matters';
 import { api } from '@/services/api';
 import { useAuthStore } from '@/store/auth-store';
 
+const validatePassword = (pwd: string): string | null => {
+    if (pwd.length < 8) return 'Password must be at least 8 characters long.';
+    if (!/[a-z]/.test(pwd)) return 'Password must include a lowercase letter (a-z).';
+    if (!/[A-Z]/.test(pwd)) return 'Password must include an uppercase letter (A-Z).';
+    if (!/[0-9]/.test(pwd)) return 'Password must include a number (0-9).';
+    return null;
+};
+
 export default function SignInScreen() {
     const router = useRouter();
     const colors = useAppTheme();
@@ -77,8 +85,9 @@ export default function SignInScreen() {
                 Alert.alert('Validation Error', 'Please enter a valid email address.');
                 return;
             }
-            if (password.length < 6) {
-                Alert.alert('Validation Error', 'Password must be at least 6 characters.');
+            const passwordErr = validatePassword(password);
+            if (passwordErr) {
+                Alert.alert('Password Error', passwordErr);
                 return;
             }
             if (password !== confirmPassword) {
@@ -123,7 +132,14 @@ export default function SignInScreen() {
                     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
                     router.replace('/(tabs)');
                 } else {
-                    Alert.alert('Registration Failed', response.message || 'An error occurred during registration.');
+                    let errorMsg = response.message || 'An error occurred during registration.';
+                    if (Array.isArray(response.errors) && response.errors.length > 0) {
+                        const details = response.errors.map((e: any) => e.message).filter(Boolean).join('\n• ');
+                        if (details) {
+                            errorMsg = `${response.message || 'Validation failed'}:\n• ${details}`;
+                        }
+                    }
+                    Alert.alert('Registration Failed', errorMsg);
                 }
             } catch (err: any) {
                 Alert.alert('Error', err?.message || 'A network error occurred. Please try again.');
@@ -293,7 +309,7 @@ export default function SignInScreen() {
                             <Text style={styles.label}>Password</Text>
                             <View style={styles.inputWrapper}>
                                 <TextInput
-                                    placeholder="At least 6 characters"
+                                    placeholder="At least 8 chars (A-Z, a-z, 0-9)"
                                     placeholderTextColor={colors.textMuted}
                                     style={[styles.input, { paddingRight: 45 }]}
                                     secureTextEntry={isSecure}
