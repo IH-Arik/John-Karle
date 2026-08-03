@@ -62,6 +62,8 @@ Protected routes require `Authorization: Bearer <access-token>`. `Admin` include
 | GET/POST         | `/memory-vault`                       | Bearer; POST is multipart  |
 | GET              | `/memory-vault/timeline`              | Bearer                     |
 | GET/PATCH/DELETE | `/memory-vault/:memoryId`             | Bearer; PATCH is multipart |
+| GET              | `/memory-vault/:memoryId/quote`       | Bearer                     |
+| POST             | `/memory-chat`                        | Bearer                     |
 | GET              | `/notifications`                      | Bearer                     |
 | GET              | `/notifications/unread-count`         | Bearer                     |
 | PATCH            | `/notifications/read-all`             | Bearer                     |

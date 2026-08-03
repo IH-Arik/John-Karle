@@ -83,3 +83,16 @@ Full request contract (what the backend sends to `john karl-AI` for a chat turn)
 ## 6. Known data-model caveat
 
 `whoseMemoryIsThis` is a plain string, not a foreign key to a family member record, even though the UI now populates it from a bounded family-member list rather than free typing. Two family members sharing a name, or a family member later renaming themselves, are not reconciled automatically (the backend's own architecture notes call this out as a general "denormalization drift" risk for family data). Any grouping of "all of Margaret's memories" for chat purposes relies on this string matching consistently — good enough for the basic scope, but a real limitation to keep in mind, not something to solve by editing the backend without the user's decision.
+
+## 7. Voice Legacy (confirmed feature — "Phase 4", decisions locked, not yet implemented)
+
+A family member can talk to a cloned voice of a person in the app — in first person, grounded in that person's memories plus persona/personality — but **only under an explicit consent model negotiated carefully during scoping**, because this feature is capable of real harm (non-consensual voice cloning is the same mechanism used in real-world impersonation/fraud) if built loosely. Full detail and rationale in `PRODUCTION_READINESS.md` → "Phase 4 Decisions (Locked)":
+
+- **Consent**: the person whose voice is used must give their own, specific, explicit consent — never inferred from a family invite, never bundled with Legacy Mode's other `accessScope` fields. Two separate opt-in toggles: **Instant** (usable now) and **Legacy-linked** (usable only once Legacy Mode actually triggers for that owner).
+- **Voice sample**: a dedicated recording made specifically for cloning, not a reused existing voice memory — both for consent clarity and clone quality.
+- **Revocation**: turning a toggle off revokes access for everyone but does not delete the underlying cloned voice model.
+- **Access**: all accepted family members, once a toggle is on.
+- **Content**: both memory-grounded facts and persona/personality-based free conversation, in first person.
+- **Persona-rule exception**: this intentionally, narrowly reverses §4's "never speak in first person" rule — but only when the referenced person consented *and* the family member explicitly invokes voice mode. Ordinary (non-voice) chat stays third-person, unchanged.
+- **Provider**: ElevenLabs. **Architecture**: a new module inside `john karl-AI`, not a separate service.
+- **Not yet decided**: cost/rate controls, data-freshness/sync — both deferred to implementation time.
