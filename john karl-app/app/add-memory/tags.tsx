@@ -4,6 +4,8 @@ import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
+    KeyboardAvoidingView,
+    Platform,
     ScrollView,
     StyleSheet,
     Text,
@@ -115,7 +117,15 @@ export default function TagsStepScreen() {
                 </View>
             </View>
 
-            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+            <KeyboardAvoidingView
+                style={{ flex: 1 }}
+                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            >
+                <ScrollView
+                    showsVerticalScrollIndicator={false}
+                    keyboardShouldPersistTaps="handled"
+                    contentContainerStyle={styles.scrollContent}
+                >
 
                 <Text style={[styles.sectionHeader, { color: palette.textDark, marginBottom: vs(20) }]}>
                     Tag this memory to help the AI find it more easily.
@@ -171,24 +181,25 @@ export default function TagsStepScreen() {
                     </TouchableOpacity>
                 </View>
 
-            </ScrollView>
+                {/* Bottom Step Advance inside ScrollView */}
+                <View style={[styles.footer, { paddingHorizontal: 0, paddingTop: vs(24), paddingBottom: vs(20) }]}>
+                    <TouchableOpacity
+                        style={[styles.continueBtn, { backgroundColor: palette.btnPrimary }]}
+                        activeOpacity={0.9}
+                        onPress={() => {
+                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                            setDraft({
+                                tags: selectedTags
+                            });
+                            router.push('/add-memory/save');
+                        }}
+                    >
+                        <Text style={styles.continueText}>Continue</Text>
+                    </TouchableOpacity>
+                </View>
 
-            {/* Bottom Step Advance */}
-            <View style={styles.footer}>
-                <TouchableOpacity
-                    style={[styles.continueBtn, { backgroundColor: palette.btnPrimary }]}
-                    activeOpacity={0.9}
-                    onPress={() => {
-                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                        setDraft({
-                            tags: selectedTags
-                        });
-                        router.push('/add-memory/save');
-                    }}
-                >
-                    <Text style={styles.continueText}>Continue</Text>
-                </TouchableOpacity>
-            </View>
+            </ScrollView>
+            </KeyboardAvoidingView>
         </SafeAreaView>
     );
 }

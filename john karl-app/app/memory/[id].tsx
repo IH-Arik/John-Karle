@@ -25,6 +25,8 @@ import { useVideoPlayer, VideoView } from 'expo-video';
 import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 import { useMemoryStore, OpenedMemory } from '@/store/memory-store';
 import Svg, { Path, Circle } from 'react-native-svg';
+import { MacPersonasModal } from '@/components/MacPersonasModal';
+import * as Haptics from 'expo-haptics';
 
 const WAVE_HEIGHT = 20; // Height of the SVG canvas
 const WAVE_AMPLITUDE = 3.5; // Amplitude of squiggles
@@ -98,7 +100,8 @@ const formatTime = (seconds: number): string => {
 };
 
 export default function MemoryDetailScreen() {
-    const { id } = useLocalSearchParams<{ id: string }>();
+    const { id, fromStories, showAiQuote } = useLocalSearchParams<{ id: string; fromStories?: string; showAiQuote?: string }>();
+    const shouldShowAiQuote = fromStories === 'true' || showAiQuote === 'true';
     const router = useRouter();
     const colors = useAppTheme();
     const isDarkMode = useColorScheme() === 'dark';
@@ -149,10 +152,12 @@ export default function MemoryDetailScreen() {
     useEffect(() => {
         if (openedMemory && openedMemory.id === id) {
             setMemory(openedMemory as ApiMemory);
-            fetchQuote(id, 0);
+            if (shouldShowAiQuote) {
+                fetchQuote(id, 0);
+            }
         }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [openedMemory]);
+    }, [openedMemory, shouldShowAiQuote]);
 
     // Audio player — source is set after memory loads
     const audioPlayer = useAudioPlayer('');
@@ -167,6 +172,7 @@ export default function MemoryDetailScreen() {
     const [seekPosition, setSeekPosition] = useState(0); // 0–1 fraction
     const [phase, setPhase] = useState(0);
     const [trackWidth, setTrackWidth] = useState(0);
+    const [showPersonsModal, setShowPersonsModal] = useState(false);
 
     // Traveling wave animation loop when audio is playing
     useEffect(() => {
@@ -276,41 +282,51 @@ export default function MemoryDetailScreen() {
         return cleanName === 'self' || cleanName === 'mine' || cleanName === currentUserName;
     }, [memory, user]);
 
-    const ownerAvatar = useMemo(() => {
-        if (!memory) return require('@/assets/images/dashboard/avatar.png');
-        const cleanName = (memory.whoseMemoryIsThis || '').trim().toLowerCase();
+    const resolveAvatarForPerson = useCallback((rawName: string) => {
+        const cleanName = rawName.trim().toLowerCase();
         const currentUserName = (user?.name || user?.firstName || '').trim().toLowerCase();
         
-        // 1. Check if it's the logged-in user
-        if (cleanName === 'self' || cleanName === 'mine' || cleanName === currentUserName) {
-            return getAvatarSource(user);
+        // 1. Logged in user check
+        if (cleanName === 'self' || cleanName === 'mine' || cleanName === 'me' || cleanName === currentUserName) {
+            return { type: 'uri', source: getAvatarSource(user) };
         }
         
-        // 2. Look up in familyMembers list from global auth store
+        // 2. Family member check
         const member = familyMembers?.find(
             (m: any) =>
                 m.name?.trim().toLowerCase() === cleanName ||
-                m.userId === memory.whoseMemoryIsThis ||
+                m.userId === rawName.trim() ||
                 m.email?.trim().toLowerCase() === cleanName
         );
 
         if (member) {
-            const avatarUrl = member.profilePicture?.url ? resolveMediaUrl(member.profilePicture.url) : null;
+            const avatarUrl = member.profilePicture?.url
+                ? resolveMediaUrl(member.profilePicture.url)
+                : (member.avatarUrl ? resolveMediaUrl(member.avatarUrl) : null);
             if (avatarUrl) {
-                return { uri: avatarUrl };
+                return { type: 'uri', source: { uri: avatarUrl } };
             }
         }
-        
-        // 3. Fallbacks for Margaret/Robert or default avatar
+
+        // 3. Known sample names check
         if (cleanName.includes('margaret')) {
-            return require('@/assets/images/dashboard/margaret.png');
+            return { type: 'uri', source: require('@/assets/images/dashboard/margaret.png') };
         }
         if (cleanName.includes('robert')) {
-            return require('@/assets/images/dashboard/robert.png');
+            return { type: 'uri', source: require('@/assets/images/dashboard/robert.png') };
         }
-        
-        return require('@/assets/images/dashboard/avatar.png');
-    }, [memory, user, familyMembers]);
+
+        return { type: 'placeholder', source: null };
+    }, [user, familyMembers]);
+
+    const taggedPersons = useMemo(() => {
+        if (!memory || !memory.whoseMemoryIsThis) return [];
+        const names = memory.whoseMemoryIsThis.split(',').map((n: string) => n.trim()).filter(Boolean);
+        return names.map((name: string) => ({
+            name,
+            avatarInfo: resolveAvatarForPerson(name)
+        }));
+    }, [memory, resolveAvatarForPerson]);
 
     const fetchMemoryDetail = useCallback(async () => {
         if (!id) return;
@@ -368,14 +384,16 @@ export default function MemoryDetailScreen() {
     useEffect(() => {
         if (id) {
             fetchMemoryDetail();
-            fetchQuote(id, 0);
+            if (shouldShowAiQuote) {
+                fetchQuote(id, 0);
+            }
         }
         // Clear the cache when leaving this screen
         return () => {
             if (retryTimeoutRef.current) clearTimeout(retryTimeoutRef.current);
             clearOpenedMemory();
         };
-    }, [id, fetchMemoryDetail, fetchQuote, clearOpenedMemory]);
+    }, [id, fetchMemoryDetail, fetchQuote, clearOpenedMemory, shouldShowAiQuote]);
 
     const mediaUrl = useMemo(() => {
         if (!memory || !memory.files || memory.files.length === 0) return undefined;
@@ -581,32 +599,34 @@ export default function MemoryDetailScreen() {
                         ) : null}
                     </View>
 
-                    {/* AI Pull-Quote & Commentary Block */}
-                    {isQuoteLoading && !quoteData ? (
-                        <View style={[styles.quoteCard, { backgroundColor: isDarkMode ? 'rgba(142,162,129,0.1)' : '#F2F6F0' }]}>
-                            <ActivityIndicator size="small" color="#8EA281" />
-                            <Text style={[styles.quotePlaceholderText, { color: isDarkMode ? '#A0A0A0' : '#666' }]}>Preparing AI quote...</Text>
-                        </View>
-                    ) : (quoteData && (quoteData.pullQuote || quoteData.commentary) ? (
-                        <View style={[styles.quoteCard, { backgroundColor: isDarkMode ? 'rgba(142,162,129,0.12)' : '#F2F6F0', borderColor: 'rgba(142,162,129,0.3)', borderWidth: 1 }]}>
-                            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: vs(6) }}>
-                                <Feather name="book-open" size={ms(14)} color="#8EA281" style={{ marginRight: ms(6) }} />
-                                <Text style={{ fontSize: ms(11), fontFamily: FONTS.serif, color: '#8EA281', letterSpacing: 0.8, textTransform: 'uppercase', fontWeight: '600' }}>
-                                    AI Insight
-                                </Text>
+                    {/* AI Pull-Quote & Commentary Block — Only shown when opened from Stories */}
+                    {shouldShowAiQuote && (
+                        isQuoteLoading && !quoteData ? (
+                            <View style={[styles.quoteCard, { backgroundColor: isDarkMode ? 'rgba(142,162,129,0.1)' : '#F2F6F0' }]}>
+                                <ActivityIndicator size="small" color="#8EA281" />
+                                <Text style={[styles.quotePlaceholderText, { color: isDarkMode ? '#A0A0A0' : '#666' }]}>Preparing AI quote...</Text>
                             </View>
-                            {quoteData.pullQuote ? (
-                                <Text style={[styles.pullQuoteText, { color: isDarkMode ? '#E0E7DC' : '#2D3E2B' }]}>
-                                    "{quoteData.pullQuote}"
-                                </Text>
-                            ) : null}
-                            {quoteData.commentary ? (
-                                <Text style={[styles.commentaryText, { color: isDarkMode ? '#B0C2A8' : '#4E6347' }]}>
-                                    {quoteData.commentary}
-                                </Text>
-                            ) : null}
-                        </View>
-                    ) : null)}
+                        ) : (quoteData && (quoteData.pullQuote || quoteData.commentary) ? (
+                            <View style={[styles.quoteCard, { backgroundColor: isDarkMode ? 'rgba(142,162,129,0.12)' : '#F2F6F0', borderColor: 'rgba(142,162,129,0.3)', borderWidth: 1 }]}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: vs(6) }}>
+                                    <Feather name="book-open" size={ms(14)} color="#8EA281" style={{ marginRight: ms(6) }} />
+                                    <Text style={{ fontSize: ms(11), fontFamily: FONTS.serif, color: '#8EA281', letterSpacing: 0.8, textTransform: 'uppercase', fontWeight: '600' }}>
+                                        AI Insight
+                                    </Text>
+                                </View>
+                                {quoteData.pullQuote ? (
+                                    <Text style={[styles.pullQuoteText, { color: isDarkMode ? '#E0E7DC' : '#2D3E2B' }]}>
+                                        "{quoteData.pullQuote}"
+                                    </Text>
+                                ) : null}
+                                {quoteData.commentary ? (
+                                    <Text style={[styles.commentaryText, { color: isDarkMode ? '#B0C2A8' : '#4E6347' }]}>
+                                        {quoteData.commentary}
+                                    </Text>
+                                ) : null}
+                            </View>
+                        ) : null)
+                    )}
 
                     <Text style={[styles.narrative, { color: isDarkMode ? '#D0D0D0' : '#444' }]}>
                         {memory.narrative}
@@ -635,13 +655,66 @@ export default function MemoryDetailScreen() {
 
                     <View style={[styles.divider, { backgroundColor: isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.08)' }]} />
 
-                    <View style={styles.authorRow}>
-                        <Image source={ownerAvatar} style={styles.authorAvatar} />
-                        <Text style={[styles.authorText, { color: colors.textMuted }]}>
-                            Whose Memory: <Text style={[styles.authorHighlight, { color: isDarkMode ? '#FFF' : colors.textDark }]}>{isMyMemory ? 'Mine' : memory.whoseMemoryIsThis}</Text>
-                        </Text>
-                    </View>
+                    <TouchableOpacity
+                        style={styles.authorRow}
+                        activeOpacity={0.8}
+                        onPress={() => {
+                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                            setShowPersonsModal(true);
+                        }}
+                    >
+                        <Text style={[styles.authorText, { color: colors.textMuted }]}>Whose Memory:</Text>
+                        <View style={styles.avatarStackContainer}>
+                            {taggedPersons.slice(0, 3).map((item, idx) => {
+                                const isFirst = idx === 0;
+                                return (
+                                    <View
+                                        key={`${item.name}-${idx}`}
+                                        style={[
+                                            styles.avatarStackCircle,
+                                            {
+                                                marginLeft: isFirst ? ms(8) : -ms(12),
+                                                borderColor: isDarkMode ? '#222220' : '#EAE8E4',
+                                                zIndex: 10 - idx,
+                                                backgroundColor: isDarkMode ? '#323239' : '#DDE0D8',
+                                            }
+                                        ]}
+                                    >
+                                        {item.avatarInfo.type === 'uri' && item.avatarInfo.source ? (
+                                            <Image source={item.avatarInfo.source} style={styles.avatarStackImg} />
+                                        ) : (
+                                            <Feather name="user" size={ms(16)} color={isDarkMode ? '#AAA' : '#666'} />
+                                        )}
+                                    </View>
+                                );
+                            })}
+                            {taggedPersons.length > 3 && (
+                                <View
+                                    style={[
+                                        styles.avatarStackCircle,
+                                        styles.moreBadgeCircle,
+                                        {
+                                            marginLeft: -ms(12),
+                                            borderColor: isDarkMode ? '#222220' : '#EAE8E4',
+                                            zIndex: 0,
+                                        }
+                                    ]}
+                                >
+                                    <Text style={styles.moreBadgeText}>+{taggedPersons.length - 3}</Text>
+                                </View>
+                            )}
+                        </View>
+                        <Feather name="chevron-right" size={ms(14)} color={colors.textMuted} style={{ marginLeft: ms(6) }} />
+                    </TouchableOpacity>
                 </View>
+
+                {/* macOS Animated Personas Modal */}
+                <MacPersonasModal
+                    visible={showPersonsModal}
+                    onClose={() => setShowPersonsModal(false)}
+                    persons={taggedPersons}
+                    isDarkMode={isDarkMode}
+                />
 
                 {/* Bottom Spacer */}
                 <View style={{ height: vs(40) }} />
@@ -900,19 +973,36 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
     },
-    authorAvatar: {
-        width: ms(32),
-        height: ms(32),
-        borderRadius: ms(16),
-        marginRight: ms(10),
-        resizeMode: 'cover',
-    },
     authorText: {
         fontFamily: FONTS.sans,
         fontSize: ms(13),
     },
-    authorHighlight: {
+    avatarStackContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    avatarStackCircle: {
+        width: ms(34),
+        height: ms(34),
+        borderRadius: ms(17),
+        borderWidth: 2,
+        overflow: 'hidden',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    avatarStackImg: {
+        width: '100%',
+        height: '100%',
+        resizeMode: 'cover',
+    },
+    moreBadgeCircle: {
+        backgroundColor: '#D2EAD8',
+    },
+    moreBadgeText: {
+        fontFamily: FONTS.sans,
+        fontSize: ms(12),
         fontWeight: '600',
+        color: '#2A5A35',
     },
     menuDropdown: {
         position: 'absolute',

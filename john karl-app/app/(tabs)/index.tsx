@@ -47,6 +47,7 @@ const formatDate = (dateString?: string) => {
 export default function DashboardScreen() {
     const colors = useAppTheme();
     const colorScheme = useColorScheme();
+    const isDarkMode = colorScheme === 'dark';
     const styles = useMemo(() => getStyles(colors), [colors]);
     const router = useRouter();
     const { user, familyMembers, fetchFamilyMembers, isProfilePictureLoading, setProfilePictureLoading } = useAuth();
@@ -178,12 +179,17 @@ export default function DashboardScreen() {
                         {familyMembers.map((member, idx) => {
                             const avatarUrl = member.profilePicture?.url
                                 ? resolveMediaUrl(member.profilePicture.url)
-                                : null;
+                                : (member.avatarUrl ? resolveMediaUrl(member.avatarUrl) : (member.avatar ? resolveMediaUrl(member.avatar) : null));
+                            const cleanName = (member.name || '').toLowerCase();
                             const avatarSource = avatarUrl
                                 ? { uri: avatarUrl }
-                                : (idx % 2 === 0
+                                : (cleanName.includes('robert')
+                                    ? require('@/assets/images/dashboard/robert.png')
+                                    : cleanName.includes('margaret')
                                     ? require('@/assets/images/dashboard/margaret.png')
-                                    : require('@/assets/images/dashboard/robert.png'));
+                                    : null);
+
+                            const count = member.memories !== undefined ? member.memories : 0;
 
                             return (
                                 <TouchableOpacity
@@ -201,10 +207,18 @@ export default function DashboardScreen() {
                                         });
                                     }}
                                 >
-                                    <Image
-                                        source={avatarSource}
-                                        style={styles.cardBgImage}
-                                    />
+                                    {avatarSource ? (
+                                        <Image
+                                            source={avatarSource}
+                                            style={styles.cardBgImage}
+                                        />
+                                    ) : (
+                                        <View style={[styles.cardBgImage, { backgroundColor: colorScheme === 'dark' ? '#23222B' : '#3A3945', justifyContent: 'center', alignItems: 'center' }]}>
+                                            <View style={{ width: ms(56), height: ms(56), borderRadius: ms(28), backgroundColor: 'rgba(255,255,255,0.12)', justifyContent: 'center', alignItems: 'center', marginBottom: vs(24) }}>
+                                                <Feather name="user" size={ms(28)} color="rgba(255,255,255,0.7)" />
+                                            </View>
+                                        </View>
+                                    )}
                                     <LinearGradient
                                         colors={['transparent', 'rgba(0,0,0,0.7)', 'rgba(0,0,0,0.9)']}
                                         style={styles.cardGradient}
@@ -217,7 +231,7 @@ export default function DashboardScreen() {
                                             <View style={styles.memoriesBadge}>
                                                 <View style={styles.smallDot} />
                                                 <Text style={styles.memoriesCount}>
-                                                    {member.memories !== undefined ? member.memories : 0} memories
+                                                    {count} {count === 1 ? 'memory' : 'memories'}
                                                 </Text>
                                             </View>
                                         </View>
@@ -252,7 +266,7 @@ export default function DashboardScreen() {
                             recentMemories.map((memory) => {
                                 const hasHeroImage = (memory.type === 'photo' || memory.type === 'video') && memory.files && memory.files.length > 0;
                                 const mediaUrl = hasHeroImage ? resolveMediaUrl(memory.files[0]?.url) : undefined;
-                                const mediaSource = mediaUrl ? { uri: mediaUrl } : require('@/assets/images/dashboard/lake.png');
+                                const isAudio = memory.type === 'voice' || memory.type === 'audio' || memory.type === 'music';
                                 const displayType = displayTypeMap[memory.type] || 'Note';
 
                                 return (
@@ -262,10 +276,20 @@ export default function DashboardScreen() {
                                         style={styles.memoryItem}
                                         onPress={() => router.push({ pathname: '/memory/[id]', params: { id: memory.id } })}
                                     >
-                                        <Image
-                                            source={mediaSource}
-                                            style={styles.memoryThumb}
-                                        />
+                                        {hasHeroImage && mediaUrl ? (
+                                            <Image
+                                                source={{ uri: mediaUrl }}
+                                                style={styles.memoryThumb}
+                                            />
+                                        ) : isAudio ? (
+                                            <View style={[styles.memoryThumb, { backgroundColor: isDarkMode ? '#222B26' : '#E8F2EC', justifyContent: 'center', alignItems: 'center' }]}>
+                                                <Ionicons name="musical-notes-outline" size={ms(20)} color={isDarkMode ? '#8EA281' : '#5A754E'} />
+                                            </View>
+                                        ) : (
+                                            <View style={[styles.memoryThumb, { backgroundColor: isDarkMode ? '#282733' : '#EFEBF6', justifyContent: 'center', alignItems: 'center' }]}>
+                                                <Feather name="file-text" size={ms(20)} color={isDarkMode ? '#A594D0' : '#6C5896'} />
+                                            </View>
+                                        )}
                                         <View style={styles.memoryContent}>
                                             <Text style={styles.memoryTitle} numberOfLines={1}>
                                                 {memory.title}
@@ -288,6 +312,10 @@ export default function DashboardScreen() {
                 <TouchableOpacity
                     activeOpacity={0.9}
                     style={styles.ctaBanner}
+                    onPress={() => {
+                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                        router.push('/add-memory' as any);
+                    }}
                 >
                     <View style={styles.ctaIconWrapper}>
                         <Ionicons name="chatbubble-outline" size={20} color={colors.textMuted} />

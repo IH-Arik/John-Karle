@@ -3,7 +3,7 @@ import { useAppTheme } from '@/hooks/use-app-theme';
 import { useAuth } from '@/hooks/use-auth';
 import { api } from '@/services/api';
 import { getAvatarSource } from '@/utils/image';
-import { Feather } from '@expo/vector-icons';
+import { Feather, Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useMemo, useState } from 'react';
@@ -84,7 +84,17 @@ export default function EditMemoryScreen() {
     const [memType, setMemType] = useState('photo');
     const [date, setDate] = useState('');           // yyyy-mm-dd
     const [friendlyDate, setFriendlyDate] = useState('');
-    const [selectedPersona, setSelectedPersona] = useState('mine');
+    const [selectedPersonas, setSelectedPersonas] = useState<string[]>(['mine']);
+
+    const togglePersona = (id: string) => {
+        setSelectedPersonas((prev) => {
+            if (prev.includes(id)) {
+                if (prev.length === 1) return prev;
+                return prev.filter((p) => p !== id);
+            }
+            return [...prev, id];
+        });
+    };
     const [selectedTags, setSelectedTags] = useState<string[]>([]);
     const [customTag, setCustomTag] = useState('');
     const [allTags, setAllTags] = useState(INITIAL_TAGS);
@@ -139,18 +149,20 @@ export default function EditMemoryScreen() {
                         setDate(ymd);
                         setFriendlyDate(isoToFriendly(mem.date || ''));
 
-                        // Match whose memory to a persona
-                        const whose = (mem.whoseMemoryIsThis || '').trim().toLowerCase();
+                        // Match whose memory to personas (multi-select format)
+                        const whoseList = (mem.whoseMemoryIsThis || '').split(',').map((s: string) => s.trim().toLowerCase());
                         const myName = (user?.name || user?.firstName || '').trim().toLowerCase();
-                        if (whose === 'self' || whose === 'mine' || whose === myName) {
-                            setSelectedPersona('mine');
-                        } else {
-                            const found = personas.find(p =>
-                                p.displayName.toLowerCase() === whose
-                            );
-                            if (found) setSelectedPersona(found.id);
-                            else setSelectedPersona('mine');
-                        }
+                        const initialSelected: string[] = [];
+                        personas.forEach((p) => {
+                            const pName = p.displayName.toLowerCase();
+                            if (
+                                whoseList.some((w: string) => w === pName) ||
+                                (p.id === 'mine' && whoseList.some((w: string) => w === 'self' || w === 'mine' || w === myName))
+                            ) {
+                                initialSelected.push(p.id);
+                            }
+                        });
+                        setSelectedPersonas(initialSelected.length > 0 ? initialSelected : ['mine']);
 
                         // Merge existing tags into the pool and pre-select them
                         if (Array.isArray(mem.tags) && mem.tags.length > 0) {
@@ -222,8 +234,8 @@ export default function EditMemoryScreen() {
             return;
         }
 
-        const persona = personas.find(p => p.id === selectedPersona);
-        const whoseMemoryIsThis = persona ? persona.displayName : 'Mine';
+        const selectedObjs = personas.filter(p => selectedPersonas.includes(p.id));
+        const whoseMemoryIsThis = selectedObjs.map(p => p.displayName).join(', ') || 'Mine';
 
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
         setIsSaving(true);
@@ -320,6 +332,7 @@ export default function EditMemoryScreen() {
                     showsVerticalScrollIndicator={false}
                     contentContainerStyle={styles.scrollContent}
                     keyboardShouldPersistTaps="handled"
+                    automaticallyAdjustKeyboardInsets={true}
                 >
 
                     {/* ── Section: Story ─────────────────────────────────── */}
@@ -386,14 +399,14 @@ export default function EditMemoryScreen() {
                         contentContainerStyle={styles.personaRow}
                     >
                         {personas.map(pers => {
-                            const isSelected = selectedPersona === pers.id;
+                            const isSelected = selectedPersonas.includes(pers.id);
                             const src = pers.isSelf && user?.profilePicture?.url
                                 ? getAvatarSource(user)
                                 : pers.img;
                             return (
                                 <TouchableOpacity
                                     key={pers.id}
-                                    onPress={() => setSelectedPersona(pers.id)}
+                                    onPress={() => togglePersona(pers.id)}
                                     activeOpacity={0.85}
                                     style={[
                                         styles.personaPill,
@@ -407,6 +420,11 @@ export default function EditMemoryScreen() {
                                     ]}>
                                         {pers.name}
                                     </Text>
+                                    {isSelected && (
+                                        <View style={{ marginLeft: ms(4) }}>
+                                            <Ionicons name="checkmark-circle" size={ms(14)} color="#FFFFFF" />
+                                        </View>
+                                    )}
                                 </TouchableOpacity>
                             );
                         })}

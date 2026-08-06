@@ -89,12 +89,20 @@ export default function TimelineScreen() {
         ...(familyMembers
             ?.filter((m: any) => m.status?.toLowerCase() === 'accepted')
             ?.map((m: any) => {
-                const avatarUrl = m.profilePicture?.url ? resolveMediaUrl(m.profilePicture.url) : null;
+                const avatarUrl = m.profilePicture?.url ? resolveMediaUrl(m.profilePicture.url) : (m.avatarUrl ? resolveMediaUrl(m.avatarUrl) : null);
+                const cleanName = (m.name || '').toLowerCase();
+                const avatar = avatarUrl
+                    ? { uri: avatarUrl }
+                    : (cleanName.includes('robert')
+                        ? AVATARS.robert
+                        : cleanName.includes('margaret')
+                        ? AVATARS.margaret
+                        : null);
                 return {
                     id:     m.userId,
                     label:  m.name,
                     userId: m.userId,
-                    avatar: avatarUrl ? { uri: avatarUrl } : (m.name?.toLowerCase().includes('robert') ? AVATARS.robert : AVATARS.margaret),
+                    avatar: avatar,
                 };
             }) ?? []),
     ];
@@ -229,8 +237,14 @@ export default function TimelineScreen() {
                                         }
                                     ]}
                                 >
-                                    {chip.avatar && (
+                                    {chip.avatar ? (
                                         <Image source={chip.avatar} style={styles.filterAvatar} />
+                                    ) : (
+                                        chip.id !== 'mine' ? (
+                                            <View style={[styles.filterAvatar, { backgroundColor: isActive ? 'rgba(255,255,255,0.25)' : (isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)'), justifyContent: 'center', alignItems: 'center' }]}>
+                                                <Feather name="user" size={ms(12)} color={isActive ? '#FFFFFF' : colors.textMuted} />
+                                            </View>
+                                        ) : null
                                     )}
                                     <Text style={[
                                         styles.filterText,
