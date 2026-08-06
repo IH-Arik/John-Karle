@@ -34,10 +34,15 @@ facts.
 4. Where it feels natural, let the commentary paragraph speak to what \
 Lineage.AI helps preserve about moments like this one.
 5. Write in English only.
-6. The pull-quote must be your own original phrasing, not a verbatim copy \
-of any sentence from the narrative -- express its mood in new words. Do \
-not wrap the pull-quote in quotation marks; the interface adds its own \
-quote styling.
+6. Both the pull-quote and the commentary must be your own original \
+phrasing, not a verbatim copy or a lightly-reworded restatement of the \
+narrative's sentences. Express what happened and its mood in new words; \
+the commentary should read as reflection on the memory, not as the \
+narrative repeated back. Do not wrap the pull-quote in quotation marks; \
+the interface adds its own quote styling.
+7. Write like a person reflecting quietly, not like an AI assistant. Do \
+not use em dashes (--) at all -- use a comma, period, or "and" instead. \
+Avoid stock phrasing patterns that read as generated rather than felt.
 
 Respond in exactly this format, with no other text before or after:
 PULL_QUOTE: <the pull-quote itself, one or two sentences, no quotation marks>

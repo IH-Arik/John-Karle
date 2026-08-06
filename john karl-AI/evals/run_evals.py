@@ -13,6 +13,7 @@ as the app, i.e. `.env`).
 
 import asyncio
 import io
+import re
 import sys
 import tempfile
 import uuid
@@ -50,6 +51,38 @@ _NAME_CONTEXT_NOTE = (
     "test separately from the source memory text (the source narrative "
     'itself may just say "mom" or use no name at all).'
 )
+
+_EM_DASH = "—"
+_VERBATIM_RUN_WORDS = 8
+
+
+def _normalized_words(text: str) -> list[str]:
+    return re.findall(r"[a-z0-9']+", text.lower())
+
+
+def _style_violation(generated_text: str, source_text: str) -> str | None:
+    """Mechanical (no-judge) style checks -- catches the two regressions a
+    prior manual test round found: em dashes reading as AI-generated, and
+    the model pasting the source narrative back nearly verbatim instead of
+    paraphrasing. Returns a human-readable violation reason, or None."""
+    if _EM_DASH in generated_text:
+        return "contains an em dash (should be paraphrased without one)"
+
+    generated_words = _normalized_words(generated_text)
+    source_words = _normalized_words(source_text)
+    generated_runs = {
+        tuple(generated_words[i : i + _VERBATIM_RUN_WORDS])
+        for i in range(len(generated_words) - _VERBATIM_RUN_WORDS + 1)
+    }
+    for i in range(len(source_words) - _VERBATIM_RUN_WORDS + 1):
+        run = tuple(source_words[i : i + _VERBATIM_RUN_WORDS])
+        if run in generated_runs:
+            quoted_run = " ".join(run)
+            return (
+                f"contains a {_VERBATIM_RUN_WORDS}+ word verbatim run "
+                f"from the source: {quoted_run!r}"
+            )
+    return None
 
 
 async def run_chat_evals(provider: AnthropicAIProvider) -> list[tuple[str, bool, str]]:
@@ -93,8 +126,13 @@ async def run_chat_evals(provider: AnthropicAIProvider) -> list[tuple[str, bool,
             check=check,
             context_note=_NAME_CONTEXT_NOTE,
         )
-        detail = f"{verdict.reason or verdict.raw}\n    answer: {answer[:200]}"
-        results.append((case.name, verdict.passed, detail))
+        style_violation = _style_violation(answer, source_text)
+        passed = verdict.passed and style_violation is None
+        reason = verdict.reason or verdict.raw
+        if style_violation:
+            reason = f"{reason}\n    STYLE VIOLATION: {style_violation}"
+        detail = f"{reason}\n    answer: {answer[:200]}"
+        results.append((case.name, passed, detail))
 
     return results
 
@@ -128,11 +166,16 @@ async def run_quote_evals(provider: AnthropicAIProvider) -> list[tuple[str, bool
             ),
             context_note=_NAME_CONTEXT_NOTE,
         )
+        style_violation = _style_violation(generated, memory_text)
+        passed = verdict.passed and style_violation is None
+        reason = verdict.reason or verdict.raw
+        if style_violation:
+            reason = f"{reason}\n    STYLE VIOLATION: {style_violation}"
         results.append(
             (
                 case.name,
-                verdict.passed,
-                f"{verdict.reason or verdict.raw}\n    quote: {quote_result.pull_quote[:150]}",
+                passed,
+                f"{reason}\n    quote: {quote_result.pull_quote[:150]}",
             )
         )
 
