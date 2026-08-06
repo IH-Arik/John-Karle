@@ -149,8 +149,8 @@
  * /api/v1/memory-vault/{memoryId}/quote:
  *   get:
  *     tags: [Memory Vault]
- *     summary: Get the AI-generated pull-quote for a memory
- *     description: Retrieves the cached Lineage.AI-generated pull-quote and commentary for a memory, if one has been generated. Returns null fields when generation hasn't completed yet.
+ *     summary: Get a freshly generated AI pull-quote for a memory
+ *     description: Calls Lineage.AI in real time to generate a pull-quote and commentary for this memory, and returns the result. Regenerated on every call (not served from a cache) — each view of a memory's detail screen gets a fresh quote.
  *     security:
  *       - BearerAuth: []
  *     parameters:
@@ -163,7 +163,7 @@
  *         description: 24-character hexadecimal MongoDB ObjectId
  *     responses:
  *       200:
- *         description: Memory quote fetched successfully (may be null if not yet generated)
+ *         description: Memory quote generated successfully
  *         content:
  *           application/json:
  *             schema:
@@ -194,6 +194,18 @@
  *               $ref: "#/components/schemas/ErrorResponse"
  *       404:
  *         description: Memory not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: "#/components/schemas/ErrorResponse"
+ *       502:
+ *         description: The AI service rejected the request
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: "#/components/schemas/ErrorResponse"
+ *       503:
+ *         description: The AI service is not configured
  *         content:
  *           application/json:
  *             schema:

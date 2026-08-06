@@ -52,13 +52,6 @@ type MemoryQuoteResponseBody = {
   latency_ms: number;
 };
 
-type CachedMemoryQuoteResponseBody = {
-  success: boolean;
-  memory_id: string;
-  pull_quote: string;
-  commentary: string;
-};
-
 const isAiServiceConfigured = (): boolean =>
   Boolean(env.AI_SERVICE_URL && env.AI_SERVICE_API_KEY);
 
@@ -136,24 +129,3 @@ export const triggerMemoryQuoteGeneration = (body: MemoryQuoteRequestBody): void
   });
 };
 
-export const fetchCachedMemoryQuote = async (
-  memoryId: string,
-): Promise<CachedMemoryQuoteResponseBody | null> => {
-  if (!isAiServiceConfigured()) {
-    return null;
-  }
-
-  const response = await fetch(
-    `${env.AI_SERVICE_URL}/api/v1/ai/memory-quote/${encodeURIComponent(memoryId)}`,
-    {
-      method: "GET",
-      headers: aiServiceHeaders(),
-    },
-  );
-
-  if (response.status === 404) {
-    return null;
-  }
-
-  return parseAiServiceResponse<CachedMemoryQuoteResponseBody>(response);
-};

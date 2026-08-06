@@ -13,7 +13,7 @@ const areAcceptedFamilyMembersMock = vi.fn();
 const createAuditLogMock = vi.fn().mockResolvedValue(undefined);
 const s3SendMock = vi.fn().mockResolvedValue({});
 const triggerMemoryQuoteGenerationMock = vi.fn();
-const fetchCachedMemoryQuoteMock = vi.fn();
+const requestMemoryQuoteGenerationMock = vi.fn();
 
 vi.mock("../src/modules/users/user-family-membership.service.js", () => ({
   areAcceptedFamilyMembers: areAcceptedFamilyMembersMock,
@@ -37,7 +37,7 @@ vi.mock("@aws-sdk/client-s3", () => ({
 
 vi.mock("../src/utils/ai-service.client.js", () => ({
   triggerMemoryQuoteGeneration: triggerMemoryQuoteGenerationMock,
-  fetchCachedMemoryQuote: fetchCachedMemoryQuoteMock,
+  requestMemoryQuoteGeneration: requestMemoryQuoteGenerationMock,
 }));
 
 const memoryVaultService = await import("../src/modules/memory-vault/memory-vault.service.js");
@@ -53,7 +53,7 @@ describe("memory vault service", () => {
     areAcceptedFamilyMembersMock.mockReset();
     createAuditLogMock.mockClear();
     triggerMemoryQuoteGenerationMock.mockClear();
-    fetchCachedMemoryQuoteMock.mockReset();
+    requestMemoryQuoteGenerationMock.mockReset();
   });
 
   it("writes an audit log when the owner creates a memory", async () => {
@@ -398,7 +398,7 @@ describe("memory vault service", () => {
     );
   });
 
-  it("returns the cached quote for a readable memory", async () => {
+  it("regenerates a fresh quote on every view for a readable memory", async () => {
     const requesterId = new Types.ObjectId();
     const ownerId = new Types.ObjectId();
     const memory = {
@@ -417,11 +417,13 @@ describe("memory vault service", () => {
 
     areAcceptedFamilyMembersMock.mockResolvedValue(true);
     vi.spyOn(MemoryVaultModel, "findById").mockReturnValue(mockExecResolved(memory) as never);
-    fetchCachedMemoryQuoteMock.mockResolvedValue({
+    requestMemoryQuoteGenerationMock.mockResolvedValue({
       success: true,
-      memory_id: memory._id.toString(),
+      request_id: "req-1",
       pull_quote: "A quote.",
       commentary: "Some commentary.",
+      usage: {},
+      latency_ms: 12,
     });
 
     const result = await memoryVaultService.getMemoryQuote(
@@ -435,9 +437,15 @@ describe("memory vault service", () => {
     );
 
     expect(result).toEqual({ pullQuote: "A quote.", commentary: "Some commentary." });
+    expect(requestMemoryQuoteGenerationMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        memory_id: memory._id.toString(),
+        person: "Owner",
+      }),
+    );
   });
 
-  it("returns nulls when no quote has been cached yet", async () => {
+  it("propagates an error when live quote generation fails", async () => {
     const ownerId = new Types.ObjectId();
     const memory = {
       _id: new Types.ObjectId(),
@@ -454,18 +462,20 @@ describe("memory vault service", () => {
     };
 
     vi.spyOn(MemoryVaultModel, "findById").mockReturnValue(mockExecResolved(memory) as never);
-    fetchCachedMemoryQuoteMock.mockResolvedValue(null);
-
-    const result = await memoryVaultService.getMemoryQuote(
-      {
-        id: ownerId.toString(),
-        email: "owner@example.com",
-        role: "user",
-        tokenVersion: 0,
-      },
-      { memoryId: memory._id.toString() },
+    requestMemoryQuoteGenerationMock.mockRejectedValue(
+      Object.assign(new Error("The AI service rejected the request."), { code: "AI_SERVICE_ERROR" }),
     );
 
-    expect(result).toEqual({ pullQuote: null, commentary: null });
+    await expect(
+      memoryVaultService.getMemoryQuote(
+        {
+          id: ownerId.toString(),
+          email: "owner@example.com",
+          role: "user",
+          tokenVersion: 0,
+        },
+        { memoryId: memory._id.toString() },
+      ),
+    ).rejects.toMatchObject({ code: "AI_SERVICE_ERROR" });
   });
 });
