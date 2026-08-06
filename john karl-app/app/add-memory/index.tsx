@@ -44,19 +44,27 @@ export default function AddMemoryScreen() {
         const list = [];
         
         // 1. Add Self
+        const userAvatarUrl = user?.profilePicture?.url ? resolveMediaUrl(user.profilePicture.url) : (user?.avatarUrl ? resolveMediaUrl(user.avatarUrl) : null);
         list.push({
             id: 'mine',
             name: 'Mine',
-            displayName: user?.name || user?.firstName || 'Sarah Mitchell',
-            img: getAvatarSource(user),
+            displayName: user?.name || user?.firstName || 'Me',
+            img: userAvatarUrl ? { uri: userAvatarUrl } : null,
             isSelf: true
         });
 
         // 2. Add family members
         if (familyMembers && familyMembers.length > 0) {
             familyMembers.forEach((member) => {
-                const avatarUrl = member.profilePicture?.url ? resolveMediaUrl(member.profilePicture.url) : null;
-                const img = avatarUrl ? { uri: avatarUrl } : (member.name?.toLowerCase().includes('robert') ? AVATARS.robert : AVATARS.margaret);
+                const avatarUrl = member.profilePicture?.url ? resolveMediaUrl(member.profilePicture.url) : (member.avatarUrl ? resolveMediaUrl(member.avatarUrl) : null);
+                const cleanName = (member.name || '').toLowerCase();
+                const img = avatarUrl
+                    ? { uri: avatarUrl }
+                    : (cleanName.includes('robert')
+                        ? AVATARS.robert
+                        : cleanName.includes('margaret')
+                        ? AVATARS.margaret
+                        : null);
                 
                 list.push({
                     id: member.userId || member.email,
@@ -73,7 +81,18 @@ export default function AddMemoryScreen() {
 
     // State Logic
     const [selectedType, setSelectedType] = useState<'photo' | 'video' | 'voice' | 'journal'>('photo');
-    const [selectedPersona, setSelectedPersona] = useState('mine');
+    const [selectedPersonas, setSelectedPersonas] = useState<string[]>(['mine']);
+
+    const togglePersona = (id: string) => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        setSelectedPersonas((prev) => {
+            if (prev.includes(id)) {
+                if (prev.length === 1) return prev;
+                return prev.filter((p) => p !== id);
+            }
+            return [...prev, id];
+        });
+    };
 
     useEffect(() => {
         resetDraft();
@@ -174,25 +193,36 @@ export default function AddMemoryScreen() {
                     contentContainerStyle={styles.personaContainer}
                 >
                     {personas.map(pers => {
-                        const isPersSelected = selectedPersona === pers.id;
+                        const isPersSelected = selectedPersonas.includes(pers.id);
                         const source = pers.isSelf && user?.profilePicture?.url ? getAvatarSource(user) : pers.img;
                         return (
                             <TouchableOpacity
                                 key={pers.id}
-                                onPress={() => setSelectedPersona(pers.id)}
+                                onPress={() => togglePersona(pers.id)}
                                 activeOpacity={0.9}
                                 style={[
                                     styles.personaPill,
                                     { backgroundColor: isPersSelected ? '#8EA281' : palette.personaBg }
                                 ]}
                             >
-                                <Image source={source} style={styles.personaImg} />
+                                {pers.img ? (
+                                    <Image source={pers.img} style={styles.personaImg} />
+                                ) : (
+                                    <View style={[styles.personaImg, { backgroundColor: isPersSelected ? 'rgba(255,255,255,0.25)' : (isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)'), justifyContent: 'center', alignItems: 'center' }]}>
+                                        <Feather name="user" size={ms(12)} color={isPersSelected ? '#FFFFFF' : (isDarkMode ? '#AAA' : '#666')} />
+                                    </View>
+                                )}
                                 <Text style={[
                                     styles.personaName,
                                     { color: isPersSelected ? '#FFFFFF' : (isDarkMode ? '#FFFFFF' : '#2D2C39') }
                                 ]}>
                                     {pers.name}
                                 </Text>
+                                {isPersSelected && (
+                                    <View style={{ marginLeft: ms(4) }}>
+                                        <Ionicons name="checkmark-circle" size={ms(14)} color="#FFFFFF" />
+                                    </View>
+                                )}
                             </TouchableOpacity>
                         );
                     })}
@@ -207,8 +237,8 @@ export default function AddMemoryScreen() {
                     activeOpacity={0.9}
                     onPress={() => {
                         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                        const found = personas.find(p => p.id === selectedPersona);
-                        const whose = found ? found.displayName : 'Margaret Mitchell';
+                        const selectedObjs = personas.filter(p => selectedPersonas.includes(p.id));
+                        const whose = selectedObjs.map(p => p.displayName).join(', ') || 'Mine';
                         setDraft({
                             type: selectedType,
                             whoseMemoryIsThis: whose

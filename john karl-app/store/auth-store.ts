@@ -31,8 +31,19 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
       const { api } = require('@/services/api');
       const response = await api.get('/users/family-members');
       if (response.success) {
-        const members = response.data?.data || response.data || [];
-        set({ familyMembers: Array.isArray(members) ? members : [] });
+        const rawMembers = response.data?.data || response.data || [];
+        if (Array.isArray(rawMembers)) {
+          const members = rawMembers.map((m: any) => {
+            const existingCount = m.memories ?? m.memoriesCount ?? m.memoryCount ?? m._count?.memories ?? m.totalMemories ?? m.memories_count;
+            return {
+              ...m,
+              memories: existingCount !== undefined ? Number(existingCount) : (m.memories !== undefined ? m.memories : 1)
+            };
+          });
+          set({ familyMembers: members });
+        } else {
+          set({ familyMembers: [] });
+        }
       }
     } catch (error) {
       console.error('[AuthStore] Failed to fetch family members:', error);

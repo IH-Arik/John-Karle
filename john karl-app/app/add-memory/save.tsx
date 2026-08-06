@@ -19,6 +19,7 @@ import { ms, vs } from 'react-native-size-matters';
 import { useAuth } from '@/hooks/use-auth';
 import { useMemoryStore } from '@/store/memory-store';
 import { getAvatarSource, resolveMediaUrl } from '@/utils/image';
+import { MacPersonasModal } from '@/components/MacPersonasModal';
 
 const STEPS = ['Type', 'Story', 'Tags', 'Save'];
 
@@ -27,6 +28,7 @@ export default function SaveReviewScreen() {
     const isDarkMode = useColorScheme() === 'dark';
     const { user, familyMembers } = useAuth();
     const { draft, createMemory, isCreating } = useMemoryStore();
+    const [showPersonsModal, setShowPersonsModal] = React.useState(false);
 
     // Chromatic Sync Engine
     const palette = {
@@ -74,40 +76,55 @@ export default function SaveReviewScreen() {
         }
     }, [draft.date]);
 
-    const personaAvatar = useMemo(() => {
-        const cleanName = (draft.whoseMemoryIsThis || '').trim().toLowerCase();
+    const resolveAvatarForPerson = useCallback((rawName: string) => {
+        const cleanName = rawName.trim().toLowerCase();
         const currentUserName = (user?.name || user?.firstName || '').trim().toLowerCase();
         
-        // 1. Check if it's the logged-in user
-        if (cleanName === 'self' || cleanName === 'mine' || cleanName === currentUserName) {
-            return getAvatarSource(user);
+        // 1. Logged in user check
+        if (cleanName === 'self' || cleanName === 'mine' || cleanName === 'me' || cleanName === currentUserName) {
+            const userAvatarUrl = user?.profilePicture?.url ? resolveMediaUrl(user.profilePicture.url) : (user?.avatarUrl ? resolveMediaUrl(user.avatarUrl) : null);
+            if (userAvatarUrl) {
+                return { type: 'uri', source: { uri: userAvatarUrl } };
+            }
+            return { type: 'placeholder', source: null };
         }
         
-        // 2. Look up in familyMembers list from global auth store
+        // 2. Family member check
         const member = familyMembers?.find(
             (m: any) =>
                 m.name?.trim().toLowerCase() === cleanName ||
-                m.userId === draft.whoseMemoryIsThis ||
+                m.userId === rawName.trim() ||
                 m.email?.trim().toLowerCase() === cleanName
         );
 
         if (member) {
-            const avatarUrl = member.profilePicture?.url ? resolveMediaUrl(member.profilePicture.url) : null;
+            const avatarUrl = member.profilePicture?.url
+                ? resolveMediaUrl(member.profilePicture.url)
+                : (member.avatarUrl ? resolveMediaUrl(member.avatarUrl) : null);
             if (avatarUrl) {
-                return { uri: avatarUrl };
+                return { type: 'uri', source: { uri: avatarUrl } };
             }
         }
-        
-        // 3. Fallbacks for Margaret/Robert or default avatar
+
+        // 3. Known sample names check
         if (cleanName.includes('margaret')) {
-            return require('@/assets/images/dashboard/margaret.png');
+            return { type: 'uri', source: require('@/assets/images/dashboard/margaret.png') };
         }
         if (cleanName.includes('robert')) {
-            return require('@/assets/images/dashboard/robert.png');
+            return { type: 'uri', source: require('@/assets/images/dashboard/robert.png') };
         }
-        
-        return require('@/assets/images/dashboard/avatar.png');
-    }, [draft.whoseMemoryIsThis, user, familyMembers]);
+
+        return { type: 'placeholder', source: null };
+    }, [user, familyMembers]);
+
+    const taggedPersons = useMemo(() => {
+        if (!draft || !draft.whoseMemoryIsThis) return [];
+        const names = draft.whoseMemoryIsThis.split(',').map((n: string) => n.trim()).filter(Boolean);
+        return names.map((name: string) => ({
+            name,
+            avatarInfo: resolveAvatarForPerson(name)
+        }));
+    }, [draft, resolveAvatarForPerson]);
 
     return (
         <SafeAreaView style={[styles.container, { backgroundColor: palette.bg }]}>
@@ -191,15 +208,67 @@ export default function SaveReviewScreen() {
                     <View style={[styles.cardDivider, { backgroundColor: palette.divider }]} />
 
                     {/* Footer Row: Locked Persona Data */}
-                    <View style={styles.personaRow}>
-                        <Image
-                            source={personaAvatar}
-                            style={styles.avatar}
-                        />
+                    <TouchableOpacity
+                        style={styles.personaRow}
+                        activeOpacity={0.8}
+                        onPress={() => {
+                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                            setShowPersonsModal(true);
+                        }}
+                    >
+                        <View style={styles.avatarStackContainer}>
+                            {taggedPersons.slice(0, 3).map((item, idx) => {
+                                const isFirst = idx === 0;
+                                return (
+                                    <View
+                                        key={`${item.name}-${idx}`}
+                                        style={[
+                                            styles.avatarStackCircle,
+                                            {
+                                                marginLeft: isFirst ? 0 : -ms(10),
+                                                borderColor: isDarkMode ? '#222220' : '#EAE8E4',
+                                                zIndex: 10 - idx,
+                                                backgroundColor: isDarkMode ? '#323239' : '#DDE0D8',
+                                            }
+                                        ]}
+                                    >
+                                        {item.avatarInfo.type === 'uri' && item.avatarInfo.source ? (
+                                            <Image source={item.avatarInfo.source} style={styles.avatarStackImg} />
+                                        ) : (
+                                            <Feather name="user" size={ms(14)} color={isDarkMode ? '#AAA' : '#666'} />
+                                        )}
+                                    </View>
+                                );
+                            })}
+                            {taggedPersons.length > 3 && (
+                                <View
+                                    style={[
+                                        styles.avatarStackCircle,
+                                        styles.moreBadgeCircle,
+                                        {
+                                            marginLeft: -ms(10),
+                                            borderColor: isDarkMode ? '#222220' : '#EAE8E4',
+                                            zIndex: 0,
+                                        }
+                                    ]}
+                                >
+                                    <Text style={styles.moreBadgeText}>+{taggedPersons.length - 3}</Text>
+                                </View>
+                            )}
+                        </View>
                         <Text style={styles.personaName}>{draft.whoseMemoryIsThis}</Text>
-                    </View>
+                        <Feather name="chevron-right" size={ms(14)} color="#8A9A86" style={{ marginLeft: 'auto' }} />
+                    </TouchableOpacity>
 
                 </View>
+
+                {/* macOS Animated Personas Modal */}
+                <MacPersonasModal
+                    visible={showPersonsModal}
+                    onClose={() => setShowPersonsModal(false)}
+                    persons={taggedPersons}
+                    isDarkMode={isDarkMode}
+                />
 
                 {/* Post-Saving Informational Banner */}
                 <View style={[styles.infoBanner, { backgroundColor: palette.bannerBg }]}>
@@ -375,10 +444,32 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         gap: ms(10),
     },
-    avatar: {
-        width: ms(26),
-        height: ms(26),
-        borderRadius: ms(13),
+    avatarStackContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    avatarStackCircle: {
+        width: ms(28),
+        height: ms(28),
+        borderRadius: ms(14),
+        borderWidth: 2,
+        overflow: 'hidden',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    avatarStackImg: {
+        width: '100%',
+        height: '100%',
+        resizeMode: 'cover',
+    },
+    moreBadgeCircle: {
+        backgroundColor: '#D2EAD8',
+    },
+    moreBadgeText: {
+        fontFamily: FONTS.sans,
+        fontSize: ms(10),
+        fontWeight: '600',
+        color: '#2A5A35',
     },
     personaName: {
         fontFamily: FONTS.serif,

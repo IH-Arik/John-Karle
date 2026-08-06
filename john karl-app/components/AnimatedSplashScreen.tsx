@@ -1,17 +1,17 @@
 import React, { useEffect, useState } from 'react';
-import { View, StyleSheet, Dimensions, Text } from 'react-native';
+import { Dimensions, StyleSheet, View } from 'react-native';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withRepeat,
-  withTiming,
-  withSpring,
-  withSequence,
-  runOnJS,
   Easing,
   interpolate,
+  runOnJS,
+  useAnimatedStyle,
+  useSharedValue,
+  withRepeat,
+  withSequence,
+  withSpring,
+  withTiming,
 } from 'react-native-reanimated';
-import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 
 const { width } = Dimensions.get('window');
 
@@ -23,53 +23,43 @@ interface AnimatedSplashScreenProps {
 export function AnimatedSplashScreen({ onComplete, isAppReady }: AnimatedSplashScreenProps) {
   const [isFadingOut, setIsFadingOut] = useState(false);
   const [isIntroComplete, setIsIntroComplete] = useState(false);
-  
+
   // Animation values
-  const logoScale = useSharedValue(0); // Start from 0 for popup effect
+  const logoScale = useSharedValue(0.4);
   const logoOpacity = useSharedValue(0);
-  const nameOpacity = useSharedValue(0);
-  const nameTranslateY = useSharedValue(20);
   const containerOpacity = useSharedValue(1);
   const breath = useSharedValue(1);
 
   // Start sequence on mount
   useEffect(() => {
-    // Wait a couple of seconds before showing the logo
-    const introTimeout = setTimeout(() => {
-      logoOpacity.value = withTiming(1, { duration: 400 });
-      // Pulse popup animation
-      logoScale.value = withSpring(1, { damping: 12, stiffness: 100, mass: 1 }, (finished) => {
-        if (finished) {
-          // Animate the app name in after logo pops up
-          nameOpacity.value = withTiming(1, { duration: 800, easing: Easing.out(Easing.ease) });
-          nameTranslateY.value = withTiming(0, { duration: 800, easing: Easing.out(Easing.back(1.5)) });
-          
-          breath.value = withRepeat(
-            withSequence(
-              withTiming(1.05, { duration: 2000, easing: Easing.inOut(Easing.ease) }),
-              withTiming(1, { duration: 2000, easing: Easing.inOut(Easing.ease) })
-            ),
-            -1,
-            true
-          );
-        }
-      });
+    // Animate logo in immediately
+    logoOpacity.value = withTiming(1, { duration: 350 });
+    logoScale.value = withSpring(1, { damping: 12, stiffness: 100, mass: 1 }, (finished) => {
+      if (finished) {
+        breath.value = withRepeat(
+          withSequence(
+            withTiming(1.04, { duration: 1800, easing: Easing.inOut(Easing.ease) }),
+            withTiming(1, { duration: 1800, easing: Easing.inOut(Easing.ease) })
+          ),
+          -1,
+          true
+        );
+      }
+    });
 
-      // Allow the app to fade out after the sequence has been shown
-      setTimeout(() => {
-        setIsIntroComplete(true);
-      }, 800 + 800 + 1500); // logo pop + name fade + display time
+    // Mark intro complete after 1.5s
+    const timer = setTimeout(() => {
+      setIsIntroComplete(true);
+    }, 1500);
 
-    }, 2000); // 2 second plain background delay
-
-    return () => clearTimeout(introTimeout);
+    return () => clearTimeout(timer);
   }, []);
 
   // Handle app ready -> fade out
   useEffect(() => {
     if (isAppReady && isIntroComplete && !isFadingOut) {
       setIsFadingOut(true);
-      containerOpacity.value = withTiming(0, { duration: 600, easing: Easing.out(Easing.ease) }, (finished) => {
+      containerOpacity.value = withTiming(0, { duration: 500, easing: Easing.out(Easing.ease) }, (finished) => {
         if (finished) {
           runOnJS(onComplete)();
         }
@@ -80,7 +70,7 @@ export function AnimatedSplashScreen({ onComplete, isAppReady }: AnimatedSplashS
   // Interactive Tap Gesture
   const tapGesture = Gesture.Tap()
     .onBegin(() => {
-      if (!isIntroComplete) return; // Don't allow tap during intro
+      if (!isIntroComplete) return;
       logoScale.value = withSpring(0.9, { damping: 10, stiffness: 200 });
     })
     .onFinalize(() => {
@@ -97,21 +87,11 @@ export function AnimatedSplashScreen({ onComplete, isAppReady }: AnimatedSplashS
     };
   });
 
-  const nameAnimatedStyle = useAnimatedStyle(() => {
-    return {
-      opacity: nameOpacity.value,
-      transform: [
-        { translateY: nameTranslateY.value },
-      ],
-    };
-  });
-
   const containerStyle = useAnimatedStyle(() => {
     return {
       opacity: containerOpacity.value,
-      // Slightly scale up the entire container as it fades out for a dramatic exit
       transform: [
-        { scale: interpolate(containerOpacity.value, [1, 0], [1, 1.1]) }
+        { scale: interpolate(containerOpacity.value, [1, 0], [1, 1.05]) }
       ]
     };
   });
@@ -121,13 +101,10 @@ export function AnimatedSplashScreen({ onComplete, isAppReady }: AnimatedSplashS
       <GestureDetector gesture={tapGesture}>
         <View style={styles.contentContainer}>
           <Animated.Image
-            source={require('@/assets/images/splash-logo.png')}
+            source={require('@/assets/images/logo.png')}
             style={[styles.image, animatedStyle]}
             resizeMode="contain"
           />
-          <Animated.Text style={[styles.appName, nameAnimatedStyle]}>
-            LineageAI
-          </Animated.Text>
         </View>
       </GestureDetector>
     </Animated.View>
@@ -137,7 +114,7 @@ export function AnimatedSplashScreen({ onComplete, isAppReady }: AnimatedSplashS
 const styles = StyleSheet.create({
   container: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: '#ffffff', // Must match app.json splash backgroundColor
+    backgroundColor: '#0F0F0F',
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 9999,
@@ -147,14 +124,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   image: {
-    width: width * 0.4,
-    height: width * 0.4,
-    marginBottom: 24,
+    width: width * 0.65,
+    height: width * 0.65,
   },
-  appName: {
-    fontFamily: 'PlayfairDisplay-SemiBold',
-    fontSize: 32,
-    color: '#2A302A',
-    letterSpacing: 1.5,
-  }
 });
