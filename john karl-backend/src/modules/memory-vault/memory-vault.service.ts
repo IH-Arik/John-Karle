@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 
 import { env } from "../../config/env.config.js";
 import {
-  fetchCachedMemoryQuote,
+  requestMemoryQuoteGeneration,
   triggerMemoryQuoteGeneration,
   type AiMemoryPayload,
 } from "../../utils/ai-service.client.js";
@@ -367,11 +367,16 @@ export const updateMemory = async (
 
 export const getMemoryQuote = async (user: AuthenticatedUser, params: MemoryVaultParams) => {
   const memory = await findReadableMemoryOrThrow(user, params.memoryId);
-  const cached = await fetchCachedMemoryQuote(memory._id.toString());
+
+  const generated = await requestMemoryQuoteGeneration({
+    memory_id: memory._id.toString(),
+    person: memory.whoseMemoryIsThis,
+    memory: toAiMemoryPayload(memory),
+  });
 
   return {
-    pullQuote: cached?.pull_quote ?? null,
-    commentary: cached?.commentary ?? null,
+    pullQuote: generated.pull_quote,
+    commentary: generated.commentary,
   };
 };
 
