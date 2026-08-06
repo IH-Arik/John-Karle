@@ -25,6 +25,17 @@ def _keywords(text: str) -> set[str]:
     }
 
 
+def _truncate_at_word_boundary(text: str, max_length: int) -> str:
+    """Truncate without cutting a word in half (e.g. "Aqua t...")."""
+    if len(text) <= max_length:
+        return text
+    truncated = text[:max_length]
+    last_space = truncated.rfind(" ")
+    if last_space > 0:
+        truncated = truncated[:last_space]
+    return truncated.rstrip(",.;: ") + "..."
+
+
 class MockAIProvider(AIProvider):
     name = "mock"
 
@@ -60,7 +71,12 @@ class MockAIProvider(AIProvider):
             citations: tuple[Citation, ...] = ()
         else:
             text = f"Mock grounded answer based on '{matched.title}'."
-            citations = (Citation(document_title=matched.title, cited_text=matched.text[:80]),)
+            citations = (
+                Citation(
+                    document_title=matched.title,
+                    cited_text=_truncate_at_word_boundary(matched.text, 80),
+                ),
+            )
 
         return ChatResult(
             text=text,
@@ -82,7 +98,10 @@ class MockAIProvider(AIProvider):
         narrative_line = next(
             (line for line in lines if line.startswith("Narrative:")), lines[-1] if lines else ""
         )
-        snippet = narrative_line.removeprefix("Narrative:").strip()[:80] or "this memory"
+        snippet = (
+            _truncate_at_word_boundary(narrative_line.removeprefix("Narrative:").strip(), 80)
+            or "this memory"
+        )
 
         pull_quote = f"A quiet moment worth remembering: {snippet}"
         commentary = (

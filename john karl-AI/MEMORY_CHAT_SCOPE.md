@@ -54,8 +54,8 @@ This is generated **from the basis of everything on the memory** — `type`, `wh
 
 **All previously-open questions are now decided** (full detail and rationale in `PRODUCTION_READINESS.md` → "Phase 2 Decisions (Locked)"):
 
-- **Timing**: generated once, at save time, and cached — not regenerated on every view.
-- **Regeneration**: triggered automatically whenever the source memory is edited (title/narrative/tags/date/location change).
+- **Timing**: generated once, at save time, and cached — not regenerated on every view. **Superseded post-launch**: after seeing the feature live, the user decided every detail-screen view should get a freshly-generated quote instead. Save-time generation still happens (as a pre-warm), but `GET /memory-vault/{id}/quote` in `john karl-backend` now calls live regeneration on every request rather than reading the cache — see `PRODUCTION_READINESS.md` → "Backend Integration Status" for the as-built behavior and the cost/latency trade-off this was chosen with full knowledge of.
+- **Regeneration**: triggered automatically whenever the source memory is edited (title/narrative/tags/date/location change) — and now also on every view, per the above.
 - **Storage**: lives in `john karl-AI`'s own database, the same way Memory Chat's conversation history does — not as a field on the backend's `MemoryVault` record.
 - **Data contract**: asynchronous. Memory save in `john karl-backend` never blocks on or depends on this generation — it's a best-effort background call, consistent with how the backend already treats other secondary side effects (email, notifications).
 - **Grounding vs. poetic license**: Lineage.AI may use evocative, poetic language to express the mood/feeling already present in the narrative (metaphor, imagery), but must never invent new factual content — new events, people, or specific details not stated or clearly implied in the source. When uncertain, it favors atmospheric/emotional elaboration over inventing facts.
