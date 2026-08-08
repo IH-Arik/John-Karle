@@ -13,6 +13,8 @@ COPY app ./app
 
 RUN pip install --upgrade pip && pip install .
 
+RUN chown -R app:app /app
+
 USER app
 EXPOSE 8000
 
