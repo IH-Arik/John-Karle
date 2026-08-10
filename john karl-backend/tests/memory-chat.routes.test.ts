@@ -7,6 +7,7 @@ process.env.LOG_LEVEL = "silent";
 
 const verifyTokenMock = vi.fn();
 const chatMock = vi.fn();
+const synthesizeSpeechMock = vi.fn();
 
 vi.mock("../src/modules/auth/auth.tokens.js", () => ({
   verifyToken: verifyTokenMock,
@@ -19,6 +20,10 @@ vi.mock("../src/modules/legacy-access/legacy-access.activity.js", () => ({
 
 vi.mock("../src/modules/memory-chat/memory-chat.service.js", () => ({
   chat: chatMock,
+}));
+
+vi.mock("../src/modules/memory-chat/memory-chat-speech.service.js", () => ({
+  synthesizeSpeech: synthesizeSpeechMock,
 }));
 
 const { createApp } = await import("../src/app.js");
@@ -66,6 +71,7 @@ describe("memory chat routes", () => {
     });
 
     chatMock.mockReset();
+    synthesizeSpeechMock.mockReset();
   });
 
   it("requires an access token to ask a memory chat question", async () => {
@@ -117,5 +123,39 @@ describe("memory chat routes", () => {
       expect.objectContaining({ id: "507f1f77bcf86cd799439013" }),
       { person: "Margaret", question: "What did Margaret love to do?" },
     );
+  });
+
+  it("requires an access token to synthesize speech", async () => {
+    const response = await request(app)
+      .post("/api/v1/memory-chat/speech")
+      .send({ text: "Margaret loved gardening.", voice: "male" });
+
+    expect(response.status).toBe(401);
+  });
+
+  it("validates the voice field when synthesizing speech", async () => {
+    const response = await request(app)
+      .post("/api/v1/memory-chat/speech")
+      .set(authHeadersFor("user-token"))
+      .send({ text: "Margaret loved gardening.", voice: "robot" });
+
+    expect(response.status).toBe(400);
+  });
+
+  it("returns synthesized audio bytes for a valid request", async () => {
+    synthesizeSpeechMock.mockResolvedValue(Buffer.from([1, 2, 3]));
+
+    const response = await request(app)
+      .post("/api/v1/memory-chat/speech")
+      .set(authHeadersFor("user-token"))
+      .send({ text: "Margaret loved gardening.", voice: "female" });
+
+    expect(response.status).toBe(200);
+    expect(response.headers["content-type"]).toBe("audio/mpeg");
+    expect(response.body).toEqual(Buffer.from([1, 2, 3]));
+    expect(synthesizeSpeechMock).toHaveBeenCalledWith({
+      text: "Margaret loved gardening.",
+      voice: "female",
+    });
   });
 });
