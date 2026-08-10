@@ -80,3 +80,56 @@
  *             schema:
  *               $ref: "#/components/schemas/ErrorResponse"
  */
+
+/**
+ * @swagger
+ * /api/v1/memory-chat/speech:
+ *   post:
+ *     tags: [Memory Chat]
+ *     summary: Synthesize speech audio for a Memory Chat answer
+ *     description: Converts the given text (typically a Lineage.AI chat answer already returned by `POST /memory-chat`) into spoken audio using a fixed assistant voice. Returns raw `audio/mpeg` bytes, not JSON.
+ *     security:
+ *       - BearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [text, voice]
+ *             properties:
+ *               text:
+ *                 type: string
+ *                 minLength: 1
+ *                 maxLength: 2000
+ *                 example: "Margaret loved spending weekends gardening with her grandchildren."
+ *               voice:
+ *                 type: string
+ *                 enum: [male, female]
+ *     responses:
+ *       200:
+ *         description: Synthesized speech audio
+ *         content:
+ *           audio/mpeg:
+ *             schema:
+ *               type: string
+ *               format: binary
+ *       400:
+ *         description: Validation error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: "#/components/schemas/ErrorResponse"
+ *       401:
+ *         description: Authentication required
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: "#/components/schemas/ErrorResponse"
+ *       502:
+ *         description: Speech synthesis failed
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: "#/components/schemas/ErrorResponse"
+ */

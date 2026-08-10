@@ -47,7 +47,14 @@
         }
       ],
       "expo-video",
-      "expo-audio"
+      "expo-audio",
+      [
+        "expo-speech-recognition",
+        {
+          "microphonePermission": "The app accesses your microphone to let you ask questions by voice.",
+          "speechRecognitionPermission": "The app uses speech recognition to turn your voice into a question."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

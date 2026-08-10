@@ -1,12 +1,16 @@
 import { FONTS } from '@/constants/theme';
 import { useAppTheme } from '@/hooks/use-app-theme';
 import { api } from '@/services/api';
+import { AssistantVoice, synthesizeSpeechToFile } from '@/services/speech-api';
 import { Feather, Ionicons } from '@expo/vector-icons';
+import { createAudioPlayer } from 'expo-audio';
 import * as Haptics from 'expo-haptics';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { ExpoSpeechRecognitionModule, useSpeechRecognitionEvent } from 'expo-speech-recognition';
 import React, { useRef, useState } from 'react';
 import {
     ActivityIndicator,
+    Alert,
     KeyboardAvoidingView,
     Platform,
     ScrollView,
@@ -66,6 +70,9 @@ export default function MemoryChatScreen() {
     ]);
     const [questionText, setQuestionText] = useState('');
     const [isSending, setIsSending] = useState(false);
+    const [isListening, setIsListening] = useState(false);
+    const [isVoiceModeOn, setIsVoiceModeOn] = useState(false);
+    const [voiceGender, setVoiceGender] = useState<AssistantVoice>('female');
     const scrollViewRef = useRef<ScrollView>(null);
 
     const palette = {
@@ -83,6 +90,88 @@ export default function MemoryChatScreen() {
         placeholder: isDarkMode ? 'rgba(255,255,255,0.4)' : 'rgba(45,44,57,0.4)',
         errorBg: isDarkMode ? 'rgba(235, 87, 87, 0.15)' : '#FDF2F2',
         errorText: isDarkMode ? '#FF8080' : '#D32F2F',
+    };
+
+    useSpeechRecognitionEvent('result', (event) => {
+        const transcript = event.results[0]?.transcript;
+        if (transcript) {
+            setQuestionText(transcript);
+        }
+    });
+
+    useSpeechRecognitionEvent('end', () => {
+        setIsListening(false);
+    });
+
+    useSpeechRecognitionEvent('error', (event) => {
+        setIsListening(false);
+        if (event.error === 'not-allowed') {
+            Alert.alert('Permission needed', 'Please allow microphone access to ask questions by voice.');
+        }
+    });
+
+    const handleMicPress = async () => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+
+        if (isListening) {
+            ExpoSpeechRecognitionModule.stop();
+            return;
+        }
+
+        const permission = await ExpoSpeechRecognitionModule.requestPermissionsAsync();
+        if (!permission.granted) {
+            Alert.alert('Permission needed', 'Please allow microphone access to ask questions by voice.');
+            return;
+        }
+
+        setIsListening(true);
+        ExpoSpeechRecognitionModule.start({
+            lang: 'en-US',
+            interimResults: true,
+            continuous: false,
+        });
+    };
+
+    const handleToggleVoiceMode = () => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+
+        if (isVoiceModeOn) {
+            setIsVoiceModeOn(false);
+            return;
+        }
+
+        Alert.alert('Turn on voice replies', 'Choose a voice for Lineage.AI to speak with.', [
+            { text: 'Cancel', style: 'cancel' },
+            {
+                text: 'Female voice',
+                onPress: () => {
+                    setVoiceGender('female');
+                    setIsVoiceModeOn(true);
+                },
+            },
+            {
+                text: 'Male voice',
+                onPress: () => {
+                    setVoiceGender('male');
+                    setIsVoiceModeOn(true);
+                },
+            },
+        ]);
+    };
+
+    const speakAnswer = async (text: string) => {
+        try {
+            const uri = await synthesizeSpeechToFile(text, voiceGender);
+            const player = createAudioPlayer({ uri });
+            player.addListener('playbackStatusUpdate', (status) => {
+                if (status.didJustFinish) {
+                    player.remove();
+                }
+            });
+            player.play();
+        } catch {
+            // Voice playback failed -- stay silently text-only for this message.
+        }
     };
 
     const handleSendQuestion = async (customQuestion?: string) => {
@@ -131,6 +220,9 @@ export default function MemoryChatScreen() {
                     citations,
                 };
                 setMessages((prev) => [...prev, aiMsg]);
+                if (isVoiceModeOn) {
+                    speakAnswer(answer);
+                }
             } else {
                 const status = response.status;
                 if (status === 403) {
@@ -229,7 +321,16 @@ export default function MemoryChatScreen() {
                     <Text style={[styles.headerSub, { color: palette.textSub }]}>AI Memory Insights</Text>
                 </View>
 
-                <View style={{ width: ms(36) }} />
+                <TouchableOpacity
+                    style={styles.voiceModeBtn}
+                    onPress={handleToggleVoiceMode}
+                >
+                    <Feather
+                        name={isVoiceModeOn ? 'volume-2' : 'volume-x'}
+                        size={ms(20)}
+                        color={isVoiceModeOn ? '#8EA281' : palette.textSub}
+                    />
+                </TouchableOpacity>
             </View>
 
             {/* Chat Body */}
@@ -334,13 +435,23 @@ export default function MemoryChatScreen() {
                 <View style={[styles.inputBar, { backgroundColor: palette.headerBg }]}>
                     <View style={[styles.inputContainer, { backgroundColor: palette.inputBg }]}>
                         <TextInput
-                            style={[styles.input, { color: palette.textDark }]}
-                            placeholder={inputPlaceholder}
+                            style={[styles.input, { flex: 1, color: palette.textDark }]}
+                            placeholder={isListening ? 'Listening…' : inputPlaceholder}
                             placeholderTextColor={palette.placeholder}
                             value={questionText}
                             onChangeText={setQuestionText}
                             onSubmitEditing={() => handleSendQuestion()}
                         />
+                        <TouchableOpacity
+                            style={styles.micBtn}
+                            onPress={handleMicPress}
+                        >
+                            <Feather
+                                name={isListening ? 'stop-circle' : 'mic'}
+                                size={ms(18)}
+                                color={isListening ? '#8EA281' : palette.textSub}
+                            />
+                        </TouchableOpacity>
                     </View>
                     <TouchableOpacity
                         style={[
@@ -372,6 +483,12 @@ const styles = StyleSheet.create({
     },
     backBtn: {
         padding: ms(6),
+    },
+    voiceModeBtn: {
+        width: ms(36),
+        height: ms(36),
+        justifyContent: 'center',
+        alignItems: 'center',
     },
     headerTitleWrapper: {
         flex: 1,
@@ -512,6 +629,8 @@ const styles = StyleSheet.create({
     },
     inputContainer: {
         flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
         borderRadius: ms(20),
         paddingHorizontal: ms(16),
         paddingVertical: vs(8),
@@ -520,6 +639,9 @@ const styles = StyleSheet.create({
         fontFamily: FONTS.sans,
         fontSize: ms(15),
         padding: 0,
+    },
+    micBtn: {
+        paddingLeft: ms(8),
     },
     sendBtn: {
         width: ms(38),

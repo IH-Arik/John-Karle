@@ -3,6 +3,8 @@ import type { RequestHandler } from "express";
 import { ApiError } from "../../utils/api-error.util.js";
 import { asyncHandler } from "../../utils/async-handler.util.js";
 import { sendSuccess } from "../../utils/response.util.js";
+import * as memoryChatSpeechService from "./memory-chat-speech.service.js";
+import type { MemoryChatSpeechInput } from "./memory-chat-speech.validation.js";
 import * as memoryChatService from "./memory-chat.service.js";
 import type { MemoryChatInput } from "./memory-chat.validation.js";
 
@@ -22,4 +24,12 @@ export const chat: RequestHandler = asyncHandler(async (req, res) => {
     message: "Memory chat response generated successfully.",
     data: result,
   });
+});
+
+export const speech: RequestHandler = asyncHandler(async (req, res) => {
+  requireAuthenticatedUser(req);
+  const audio = await memoryChatSpeechService.synthesizeSpeech(req.body as MemoryChatSpeechInput);
+
+  res.set("Content-Type", "audio/mpeg");
+  res.send(audio);
 });
