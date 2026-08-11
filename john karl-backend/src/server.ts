@@ -5,6 +5,7 @@ import {
   startLegacyAccessScheduler,
   stopLegacyAccessScheduler,
 } from "./modules/legacy-access/legacy-access.service.js";
+import { registerMemoryChatVoiceWebSocket } from "./modules/memory-chat/memory-chat.ws.js";
 import { ensureSuperAdmin } from "./modules/users/user.seed.js";
 import { logger } from "./utils/logger.util.js";
 
@@ -16,6 +17,8 @@ const startServer = async (): Promise<void> => {
   const server = app.listen(env.PORT, "0.0.0.0", () => {
     logger.info(`Server listening on http://localhost:${env.PORT}`);
   });
+
+  registerMemoryChatVoiceWebSocket(server);
 
   const shutdown = (signal: NodeJS.Signals): void => {
     logger.info({ signal }, "shutdown signal received");
