@@ -25,6 +25,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ms, vs } from 'react-native-size-matters';
 
 import { useAuth } from '@/hooks/use-auth';
+import { ChatGPTVoiceButton } from '@/components/ChatGPTVoiceButton';
 
 interface Citation {
     memoryTitle: string;
@@ -74,6 +75,7 @@ export default function MemoryChatScreen() {
     const [isVoiceModeOn, setIsVoiceModeOn] = useState(false);
     const [voiceGender, setVoiceGender] = useState<AssistantVoice>('female');
     const scrollViewRef = useRef<ScrollView>(null);
+    const isNavigatingToCallRef = useRef(false);
 
     const palette = {
         bg: isDarkMode ? '#121212' : '#F9F8F6',
@@ -157,6 +159,24 @@ export default function MemoryChatScreen() {
                 },
             },
         ]);
+    };
+
+    const handleStartVoiceCall = () => {
+        if (isNavigatingToCallRef.current) return; // guard against a double-tap pushing two call screens
+        isNavigatingToCallRef.current = true;
+        setTimeout(() => {
+            isNavigatingToCallRef.current = false;
+        }, 1000);
+
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        router.push({
+            pathname: '/chat/voice-call',
+            params: {
+                person: personName,
+                ...(familyMemberUserId ? { familyMemberUserId } : {}),
+                voice: voiceGender,
+            },
+        });
     };
 
     const speakAnswer = async (text: string) => {
@@ -453,6 +473,11 @@ export default function MemoryChatScreen() {
                             />
                         </TouchableOpacity>
                     </View>
+                    <ChatGPTVoiceButton
+                        size={ms(38)}
+                        isDarkMode={isDarkMode}
+                        onPress={handleStartVoiceCall}
+                    />
                     <TouchableOpacity
                         style={[
                             styles.sendBtn,
