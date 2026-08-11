@@ -52,16 +52,6 @@ specific information about...", "It's worth noting that...", "I'd be happy \
 to..."). Vary sentence length and structure like natural speech would.
 8. Keep answers grounded, warm, and concise."""
 
-_VERIFICATION_SYSTEM_PROMPT = """You are a strict fact-checker for a \
-family-memory chat assistant. You will be shown source memories (as \
-documents) and a drafted answer. Rewrite the answer so it contains ONLY \
-facts explicitly supported by the source memories. Remove or soften any \
-claim that is not directly supported -- if removing a claim would leave \
-nothing, say plainly that the information isn't available rather than \
-inventing a replacement. If the drafted answer already only uses supported \
-facts, return it unchanged. Return only the corrected answer text, with no \
-preamble, quotes, or explanation."""
-
 _SUMMARY_SYSTEM_PROMPT = """Summarize the following conversation turns \
 concisely, in a few sentences. Preserve any facts, names, and open \
 questions that later turns might still need to reference. Return only the \
@@ -100,11 +90,11 @@ class MemoryChatService:
             history=history,
             question=payload.question,
         )
-        final_text = await self._verify_grounding(
-            documents=documents,
-            question=payload.question,
-            draft_answer=draft_text,
-        )
+        # Verification pass (draft + separate fact-check call) disabled for
+        # latency -- see PRODUCTION_READINESS.md. Speed was explicitly
+        # prioritized over the extra grounding safety net for voice calls,
+        # and this path is shared with text chat too.
+        final_text = draft_text
 
         await self._conversations.append_turns(
             payload.conversation_id,
@@ -182,39 +172,6 @@ class MemoryChatService:
 
         usage = Usage(input_tokens=result.input_tokens, output_tokens=result.output_tokens)
         return result.text, result.citations, usage
-
-    async def _verify_grounding(
-        self,
-        *,
-        documents: tuple[DocumentBlock, ...],
-        question: str,
-        draft_answer: str,
-    ) -> str:
-        """Second grounding pass: a cheap safety net, not the primary path.
-
-        If this check itself fails (timeout, provider error), fall back to
-        the drafted answer rather than failing the whole request -- an
-        unavailable verifier should degrade gracefully, not block the chat.
-        """
-        verification_question = (
-            f"Question that was asked: {question}\n\nDrafted answer to check:\n{draft_answer}"
-        )
-        try:
-            async with asyncio.timeout(self._settings.ai_timeout_seconds):
-                result = await self._provider.chat(
-                    ChatRequest(
-                        system_prompt=_VERIFICATION_SYSTEM_PROMPT,
-                        documents=documents,
-                        history=(),
-                        question=verification_question,
-                        max_tokens=self._settings.ai_default_max_tokens,
-                    )
-                )
-        except Exception:
-            return draft_answer
-
-        corrected = result.text.strip()
-        return corrected or draft_answer
 
     async def _maybe_refresh_summary(self, conversation_id: str) -> None:
         older_turns = await self._conversations.get_turns_before_window(conversation_id)
